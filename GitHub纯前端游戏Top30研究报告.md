@@ -34,25 +34,25 @@
 | 9 | Clumsy Bird | ellisonleao/clumsy-bird | ~1.5k | 动作 | ✅ |
 | 10 | cube-composer | sharkdp/cube-composer | ~1.2k | 编程益智 | ✅ |
 | 11 | 3d.city | nickoala/3d.city | ~1k | 城市建设 | ✅ |
-| 12 | Diablo JS | nickyout/nickyout.github.io | ~900 | 动作 RPG | ✅ |
-| 13 | Crossy Road (Expo) | EvanBacon/Expo-Crossy-Road | ~800 | 休闲 | ✅ |
+| 12 | Diablo JS | mitallast/diablo-js | ~900 | 动作 RPG | ✅ |
+| 13 | Crossy Road (Expo) | EvanBacon/Expo-Crossy-Road | ~1.1k | 休闲 | ✅ |
 | 14 | JavaScript Tetris | jakesgordon/javascript-tetris | ~500 | 经典益智 | ✅ |
 | 15 | Agar.io Clone | owenashurst/agar.io-clone | ~500 | IO 多人 | ⚠️ |
-| 16 | Particle Clicker | particle-clicker/particle-clicker | ~500 | 增量 | ✅ |
+| 16 | Particle Clicker | particle-clicker/particle-clicker | ~660 | 增量 | ✅ |
 | 17 | Slither.io Clone | knagaitsev/slither.io-clone | ~400 | IO 多人 | ⚠️ |
 | 18 | CrappyBird | varunpant/CrappyBird | ~350 | 动作 | ✅ |
-| 19 | Pacman (Canvas) | mumuy/pacman | ~300 | 经典街机 | ✅ |
+| 19 | Pacman (HTML5) | daleharvey/pacman | ~300 | 经典街机 | ✅ |
 | 20 | Freeciv-web | freeciv/freeciv-web | ~300 | 回合策略 | ⚠️ |
 | 21 | Sand Game JS | Hartrik/sand-game-js | ~200 | 沙盒模拟 | ✅ |
-| 22 | Green Mahjong | nicbarker/green-mahjong | ~100 | 棋牌 | ✅ |
-| 23 | Onslaught Arena | lostdecade/onslaught_arena | ~100 | 射击 | ✅ |
-| 24 | Command & Conquer (HTML5) | nickyout/nickyout.github.io | ~100 | 即时策略 | ✅ |
-| 25 | Mario (HTML5) | nickyout/nickyout.github.io | ~100 | 平台跳跃 | ✅ |
-| 26 | Tower Defense (Three.js) | schteppe/three.js-tower-defense | ~100 | 塔防 | ✅ |
-| 27 | Trigger Rally | nickyout/nickyout.github.io | ~100 | 赛车 | ✅ |
-| 28 | Coil | nickyout/nickyout.github.io | ~80 | 休闲 | ✅ |
-| 29 | Space Invaders | nickyout/nickyout.github.io | ~80 | 经典射击 | ✅ |
-| 30 | 3D Hartwing Chess Set | nickyout/nickyout.github.io | ~500 | 棋类 | ✅ |
+| 22 | Green Mahjong | danbeck/green-mahjong | ~80 | 棋牌 | ✅ |
+| 23 | Onslaught Arena | lostdecade/onslaught_arena | ~195 | 射击 | ✅ |
+| 24 | Command & Conquer (HTML5) | adityaravishankar/command-and-conquer | ~200 | 即时策略 | ✅ |
+| 25 | Infinite Mario (HTML5) | robertkleffner/mariohtml5 | ~150 | 平台跳跃 | ✅ |
+| 26 | Tower Defense (Three.js) | Casmo/tower-defense | ~100 | 塔防 | ✅ |
+| 27 | Trigger Rally | CodeArtemis/TriggerRally | ~100 | 赛车 | ✅ |
+| 28 | Coil | leereilly/Coil | ~80 | 休闲 | ✅ |
+| 29 | Space Invaders (JS) | dwmkerr/spaceinvaders | ~100 | 经典射击 | ✅ |
+| 30 | 3D Hartwig Chess Set | juliangarnier/3D-Hartwig-chess-set | ~526 | 棋类 | ✅ |
 
 > **纯前端说明**：✅ = 纯静态文件即可运行（无需后端服务器）；⚠️ = 需要 Node.js 等后端服务支持多人功能，但前端代码是核心
 
@@ -223,20 +223,21 @@
 ---
 
 #### 12. Diablo JS
-- **仓库**：[nickyout/nickyout.github.io](https://github.com/nickyout/nickyout.github.io) (相关项目)
+- **仓库**：[mitallast/diablo-js](https://github.com/mitallast/diablo-js)
 - **Stars**：~900
 - **技术栈**：HTML5 Canvas + JavaScript
-- **简介**：等距视角的暗黑破坏神风格动作 RPG。使用 HTML5 Canvas 实现了等距视角、角色移动、战斗等核心机制。以极少的代码量展示了等距游戏的实现方法。
+- **简介**：等距视角的暗黑破坏神风格动作 RPG。从 Diablo 2 中提取了一个原版关卡，用 HTML5 Canvas 实现了等距视角渲染、角色移动、地图探索等核心机制。以极少的代码量展示了等距游戏的实现方法。按 `[Tab]` 可显示地图。
 - **亮点**：
   - 等距视角（Isometric）渲染的优秀示例
   - 代码量极小但效果惊人
   - 纯 Canvas 2D 实现
+  - MIT 开源协议
 
 ---
 
 #### 13. Crossy Road (Expo)
 - **仓库**：[EvanBacon/Expo-Crossy-Road](https://github.com/EvanBacon/Expo-Crossy-Road)
-- **Stars**：~800
+- **Stars**：~1,100
 - **技术栈**：React Native + Expo + Three.js + WebGL
 - **简介**：经典《过马路》游戏的跨平台克隆。使用 Expo 框架，可同时在 iOS、Android 和 Web 上运行。3D 低多边形风格，角色需要在车流中穿梭。
 - **亮点**：
@@ -272,7 +273,7 @@
 
 #### 16. Particle Clicker（粒子点击器）
 - **仓库**：[particle-clicker/particle-clicker](https://github.com/particle-clicker/particle-clicker)
-- **Stars**：~500
+- **Stars**：~660
 - **技术栈**：HTML + CSS + JavaScript
 - **简介**：以高能物理为主题的增量（放置）游戏。玩家经营一个粒子物理实验室，通过点击产生数据，雇佣研究人员，升级探测器，重现粒子物理学的重大发现历程。由 CERN 的物理学家们创作。
 - **亮点**：
@@ -306,9 +307,11 @@
 
 ---
 
-#### 19. Pacman (Canvas)
+#### 19. Pacman (HTML5)
+- **仓库**：[daleharvey/pacman](https://github.com/daleharvey/pacman)
+- **Stars**：~300
 - **技术栈**：HTML5 Canvas + JavaScript
-- **简介**：经典吃豆人游戏的 HTML5 实现。完整再现了原版的迷宫、豆子、能量丸、四种颜色的幽灵及其不同的 AI 行为模式。
+- **简介**：经典吃豆人游戏的 HTML5 实现。完整再现了原版的迷宫、豆子、能量丸、四种颜色的幽灵及其不同的 AI 行为模式。是最知名的 HTML5 Pacman 开源实现之一。
 - **亮点**：
   - 完整还原经典街机体验
   - 幽灵 AI 行为的经典实现
@@ -341,17 +344,21 @@
 ---
 
 #### 22. Green Mahjong
-- **技术栈**：HTML + CSS + JavaScript
-- **简介**：开源的网页版麻将接龙（Solitaire Mahjong）游戏。翠绿色的清新设计风格，支持触屏操作，适合移动设备。
+- **仓库**：[danbeck/green-mahjong](https://github.com/danbeck/green-mahjong)
+- **Stars**：~80
+- **技术栈**：HTML5 + CSS + JavaScript
+- **简介**：开源的 GPLv3 网页版麻将接龙（Solitaire Mahjong）游戏。三种主题风格、六种棋盘布局，支持所有主流桌面和移动浏览器。目标是匹配并移除成对的相同牌面。
 - **亮点**：
   - 纯前端实现，无需后端
-  - 清新的设计风格
-  - 移动端友好
+  - 三种主题 + 六种布局
+  - 支持 Android/iPhone/Ubuntu/Firefox OS
+  - GPLv3 开源协议
 
 ---
 
 #### 23. Onslaught! Arena
 - **仓库**：[lostdecade/onslaught_arena](https://github.com/lostdecade/onslaught_arena)
+- **Stars**：~195
 - **技术栈**：HTML5 Canvas + JavaScript
 - **简介**：快节奏的竞技场射击游戏。在 HTML5 Canvas 中抵御一波又一波经典中世纪怪物的进攻。这是早期 HTML5 游戏的经典代表之一。
 - **亮点**：
@@ -362,71 +369,88 @@
 ---
 
 #### 24. Command & Conquer (HTML5)
-- **技术栈**：HTML5 + JavaScript
-- **简介**：经典即时策略游戏《命令与征服》的 HTML5 克隆。在浏览器中体验建造基地、训练士兵、指挥战斗的 RTS 玩法。
+- **仓库**：[adityaravishankar/command-and-conquer](https://github.com/adityaravishankar/command-and-conquer)
+- **Stars**：~200
+- **技术栈**：HTML5 Canvas + JavaScript
+- **简介**：经典即时策略游戏《命令与征服：泰伯利亚黎明》的 HTML5 重现。在浏览器中体验建造基地、训练士兵、指挥战斗的 RTS 玩法。包含 AI、寻路系统和多种单位。
 - **亮点**：
-  - RTS 游戏的 Web 实现
-  - 复杂游戏类型的前端化展示
+  - 完整 RTS 游戏机制的纯 Web 实现
+  - 包含 AI 和寻路系统
+  - 技术概念验证的优秀案例
 
 ---
 
 #### 25. Infinite Mario (HTML5)
+- **仓库**：[robertkleffner/mariohtml5](https://github.com/robertkleffner/mariohtml5)
+- **Stars**：~150
 - **技术栈**：HTML5 Canvas + JavaScript + Audio API
-- **简介**：超级马里奥的 HTML5 无限版。使用 Canvas 和 Audio 元素实现了马里奥的经典跳跃、踩敌人、吃蘑菇等核心玩法，关卡随机生成，永远不会重复。
+- **简介**：超级马里奥的 HTML5 无限版。使用 Canvas 和 Audio 元素实现了马里奥的经典跳跃、踩敌人、吃蘑菇等核心玩法，关卡随机生成，永远不会重复。是最早的 HTML5 Canvas 游戏经典之一。
 - **亮点**：
   - 程序化关卡生成
   - 经典平台跳跃的完整实现
-  - 展示 HTML5 Audio API 的使用
+  - 展示 HTML5 Canvas + Audio API 的使用
+  - 被大量 fork，是学习平台游戏的经典参考
 
 ---
 
 #### 26. Tower Defense (Three.js)
+- **仓库**：[Casmo/tower-defense](https://github.com/Casmo/tower-defense)
+- **Stars**：~100
 - **技术栈**：HTML5 + Three.js (WebGL)
-- **简介**：使用 Three.js 制作的 3D 塔防游戏。在 3D 场景中布置防御塔，抵御敌人的进攻。将经典塔防玩法提升到 3D 维度。
+- **简介**：使用 Three.js 制作的 3D 塔防游戏。在 3D 场景中布置防御塔，抵御敌人的进攻。将经典塔防玩法提升到 3D 维度。在 Firefox 或 Chrome 中直接打开 index.html 即可运行。
 - **亮点**：
   - Three.js 3D 游戏的实战案例
   - 经典塔防机制的 3D 化
-  - A* 寻路算法实现
+  - 支持自定义 3D 模型（.obj 格式）
 
 ---
 
 #### 27. Trigger Rally
-- **技术栈**：HTML5 + Three.js (WebGL)
-- **简介**：快节奏的 3D 拉力赛车游戏。在各种地形赛道上驾驶赛车，追求最快圈速。使用 Three.js 渲染 3D 场景和车辆物理。
+- **仓库**：[CodeArtemis/TriggerRally](https://github.com/CodeArtemis/TriggerRally)
+- **Stars**：~100
+- **技术栈**：HTML5 + JavaScript + WebGL
+- **简介**：快节奏的 3D 拉力赛车在线版。在各种地形赛道上驾驶赛车，追求最快圈速。使用 WebGL 渲染 3D 场景和车辆物理，支持在线排行榜。
 - **亮点**：
   - 浏览器中的 3D 赛车物理
   - 多种赛道和地形
-  - WebGL 渲染的优秀示例
+  - WebGL 3D 渲染的优秀示例
 
 ---
 
 #### 28. Coil
+- **仓库**：[leereilly/Coil](https://github.com/leereilly/Coil)
+- **Stars**：~80
 - **技术栈**：HTML5 Canvas + JavaScript
-- **简介**：在 HTML5 Canvas 中控制一条线，通过缠绕包围敌人来消灭它们。玩法独特有趣，操作简单但策略性强。
+- **简介**：在 HTML5 Canvas 中控制一条线，通过缠绕包围敌人来消灭它们。由 Hakim El Hattab（@hakimel）创作。玩法独特有趣，操作简单但策略性强。使用双 Canvas 层实现特效和游戏世界的分离渲染。
 - **亮点**：
   - 独创性的"缠绕"游戏机制
-  - 纯 Canvas 实现
+  - 双 Canvas 层渲染架构
   - 简单但有深度
 
 ---
 
 #### 29. Space Invaders (JS)
-- **技术栈**：HTML5 + JavaScript + require.js
-- **简介**：经典《太空入侵者》的 JavaScript 重制版。保留了原版的所有经典元素：逐步逼近的外星人编队、防护掩体、神秘飞碟等。
+- **仓库**：[dwmkerr/spaceinvaders](https://github.com/dwmkerr/spaceinvaders)
+- **Stars**：~100
+- **技术栈**：HTML5 Canvas + JavaScript
+- **简介**：经典《太空入侵者》的 JavaScript 学习项目。保留了原版的所有经典元素：逐步逼近的外星人编队、防护掩体、神秘飞碟等。包含动态星空背景特效。
 - **亮点**：
   - 经典街机游戏的忠实再现
-  - 模块化 JavaScript 架构
-  - 逐步加快的难度节奏
+  - 作为学习练习编写，代码清晰易读
+  - 动态星空背景特效
 
 ---
 
-#### 30. 3D Hartwing Chess Set
-- **技术栈**：HTML + CSS + JavaScript (WebGL)
-- **简介**：精美的 3D 国际象棋游戏。使用 WebGL 渲染逼真的 3D 棋盘和棋子，支持完整的国际象棋规则和 AI 对手。
+#### 30. 3D Hartwig Chess Set
+- **仓库**：[juliangarnier/3D-Hartwig-chess-set](https://github.com/juliangarnier/3D-Hartwig-chess-set)
+- **Stars**：~526
+- **技术栈**：HTML + CSS3 3D Transforms + JavaScript
+- **简介**：精美的 3D 国际象棋游戏，完全可玩。使用纯 CSS 3D 变换（而非 WebGL）渲染 3D 棋盘和棋子，配合 [Photon](http://photon.attasi.com) 实现光影效果，使用 [Chess.js](https://github.com/jhlywa/chess.js) 实现棋规逻辑。由知名前端开发者 Julian Garnier（anime.js 作者）创作。
 - **亮点**：
-  - 精美的 3D 棋子模型
-  - 完整的国际象棋规则实现
-  - WebGL 3D 渲染展示
+  - 纯 CSS 3D 变换实现（不依赖 WebGL）
+  - 完整的国际象棋规则（Chess.js）
+  - Julian Garnier（anime.js 作者）的作品
+  - CodePen 上广泛传播的经典前端 Demo
 
 ---
 
