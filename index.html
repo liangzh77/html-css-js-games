@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>前端游戏合集 - GitHub Top 30</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #f5f5f7;
+  --card-bg: #ffffff;
+  --text-primary: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --text-tertiary: #86868b;
+  --border: rgba(0,0,0,0.06);
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-hover: 0 8px 30px rgba(0,0,0,0.12);
+  --accent: #0071e3;
+  --accent-hover: #0077ED;
+  --radius: 20px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hero */
+.hero {
+  text-align: center;
+  padding: 80px 24px 60px;
+  background: linear-gradient(180deg, #fbfbfd 0%, var(--bg) 100%);
+}
+.hero h1 {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #1d1d1f 0%, #424245 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero .subtitle {
+  font-size: 21px;
+  color: var(--text-secondary);
+  margin-top: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.hero .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 6px 16px;
+  background: var(--card-bg);
+  border-radius: 100px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow);
+}
+.hero .badge span { font-weight: 600; color: var(--accent); }
+
+/* Filter */
+.filter-bar {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 40px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.filter-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  transition: all 0.25s ease;
+  font-family: inherit;
+}
+.filter-btn:hover { color: var(--text-primary); box-shadow: var(--shadow); }
+.filter-btn.active {
+  background: var(--text-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+/* Card */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.35s ease;
+  display: flex;
+  flex-direction: column;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+}
+.card-banner {
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.card-banner .emoji {
+  font-size: 52px;
+  z-index: 1;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15));
+}
+.card-banner .rank {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 3px 10px;
+  border-radius: 100px;
+  z-index: 2;
+}
+.card-banner .stars-badge {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  background: rgba(0,0,0,0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 3px 10px;
+  border-radius: 100px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.card-body {
+  padding: 20px 22px 22px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.card-body h3 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-bottom: 2px;
+}
+.card-body .en-name {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.card-body .desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  flex: 1;
+}
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  background: #f5f5f7;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.card-footer {
+  display: flex;
+  gap: 10px;
+  padding: 0 22px 22px;
+}
+.card-footer a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 0;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.btn-play {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-play:hover { background: var(--accent-hover); }
+.btn-github {
+  background: var(--text-primary);
+  color: #fff;
+}
+.btn-github:hover { background: #333; }
+.btn-github svg { width: 16px; height: 16px; fill: #fff; }
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 40px 24px 60px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.8;
+  border-top: 1px solid var(--border);
+  max-width: 680px;
+  margin: 0 auto;
+}
+footer a { color: var(--text-secondary); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+
+/* Responsive */
+@media (max-width: 734px) {
+  .hero h1 { font-size: 36px; }
+  .hero .subtitle { font-size: 17px; }
+  .hero { padding: 60px 20px 40px; }
+  .grid { grid-template-columns: 1fr; padding: 0 16px 60px; }
+  .filter-bar { padding: 0 16px 28px; }
+}
+
+/* Animation */
+.card { opacity: 0; transform: translateY(24px); animation: fadeUp 0.5s ease forwards; }
+@keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <h1>前端游戏合集</h1>
+  <p class="subtitle">GitHub 最受欢迎的 30 款纯前端开源游戏，在浏览器中即刻畅玩</p>
+  <div class="badge">共 <span>30</span> 款游戏 · 纯 HTML/CSS/JS · 零依赖即开即玩</div>
+</section>
+
+<div class="filter-bar" id="filterBar"></div>
+<div class="grid" id="grid"></div>
+
+<footer>
+  基于 <a href="https://github.com" target="_blank">GitHub</a> 开源项目研究整理<br>
+  每款游戏均为单文件实现，无需服务器，双击 index.html 即可运行
+</footer>
+
+<script>
+const games = [
+  { rank: 1, name: "2048 游戏", en: "2048", emoji: "🔢", color: "#edc53f",
+    desc: "经典数字滑块益智游戏，在 4×4 网格上合并方块，挑战 2048。",
+    stars: "12k+", type: "益智", tech: "Vanilla JS",
+    folder: "01-2048", repo: "https://github.com/gabrielecirulli/2048" },
+  { rank: 2, name: "浏览器冒险", en: "BrowserQuest", emoji: "⚔️", color: "#5b8c5a",
+    desc: "像素风 RPG 冒险游戏，探索奇幻世界、战斗收集装备。",
+    stars: "9.3k", type: "RPG", tech: "Canvas",
+    folder: "02-browser-quest", repo: "https://github.com/mozilla/BrowserQuest" },
+  { rank: 3, name: "黑暗房间", en: "A Dark Room", emoji: "🕯️", color: "#2c2c2e",
+    desc: "极简主义文字冒险，从一间黑暗的房间开始揭开庞大世界。",
+    stars: "7.8k", type: "文字冒险", tech: "Vanilla JS",
+    folder: "03-a-dark-room", repo: "https://github.com/doublespeakgames/adarkroom" },
+  { rank: 4, name: "不可信的代码", en: "Untrusted", emoji: "💻", color: "#0a0a0a",
+    desc: "元 JavaScript 冒险游戏，通过修改源代码来通关每一关。",
+    stars: "4.6k", type: "编程解谜", tech: "JavaScript",
+    folder: "04-untrusted", repo: "https://github.com/AlexNisnevich/untrusted" },
+  { rank: 5, name: "沙之画", en: "Sandspiel", emoji: "🏖️", color: "#e8b84b",
+    desc: "创意粒子模拟沙盒，用沙、水、火等元素自由创作。",
+    stars: "3k", type: "沙盒模拟", tech: "Canvas",
+    folder: "05-sandspiel", repo: "https://github.com/MaxBittker/sandspiel" },
+  { rank: 6, name: "猜词游戏", en: "Wordle", emoji: "📝", color: "#538d4e",
+    desc: "每日猜词挑战，六次机会猜出五字母单词。",
+    stars: "2.5k", type: "猜词", tech: "JavaScript",
+    folder: "06-wordle", repo: "https://github.com/cwackerfuss/react-wordle" },
+  { rank: 7, name: "六边形消除", en: "Hextris", emoji: "⬡", color: "#e94560",
+    desc: "快节奏六边形益智游戏，旋转接住同色方块使其消除。",
+    stars: "2k", type: "益智", tech: "Canvas",
+    folder: "07-hextris", repo: "https://github.com/Hextris/hextris" },
+  { rank: 8, name: "未来竞速", en: "HexGL", emoji: "🚀", color: "#08f",
+    desc: "未来风格伪 3D 赛车游戏，在霓虹赛道上高速飞驰。",
+    stars: "1.5k", type: "竞速", tech: "Canvas / 伪3D",
+    folder: "08-hexgl", repo: "https://github.com/BKcore/HexGL" },
+  { rank: 9, name: "笨鸟先飞", en: "Clumsy Bird", emoji: "🐦", color: "#4ec0ca",
+    desc: "Flappy Bird 像素风克隆，点击让小鸟飞过管道。",
+    stars: "1.5k", type: "动作", tech: "Canvas",
+    folder: "09-clumsy-bird", repo: "https://github.com/ellisonleao/clumsy-bird" },
+  { rank: 10, name: "方块作曲家", en: "cube-composer", emoji: "🧊", color: "#9b59b6",
+    desc: "函数式编程益智游戏，组合 map、filter 等操作变换方块。",
+    stars: "1.2k", type: "编程益智", tech: "JavaScript",
+    folder: "10-cube-composer", repo: "https://github.com/sharkdp/cube-composer" },
+  { rank: 11, name: "模拟城市", en: "3d.city", emoji: "🏙️", color: "#3498db",
+    desc: "等距视角城市建设模拟，建造道路、建筑，发展城市。",
+    stars: "1k", type: "城市建设", tech: "Canvas / 等距",
+    folder: "11-3d-city", repo: "https://github.com/nickoala/3d.city" },
+  { rank: 12, name: "暗黑破坏者", en: "Diablo JS", emoji: "👹", color: "#8b0000",
+    desc: "等距视角动作 RPG，在黑暗地牢中战斗与探索。",
+    stars: "900", type: "动作RPG", tech: "Canvas / 等距",
+    folder: "12-diablo-js", repo: "https://github.com/mitallast/diablo-js" },
+  { rank: 13, name: "过马路", en: "Crossy Road", emoji: "🐔", color: "#7ec850",
+    desc: "经典过马路休闲游戏，在车流中穿梭跳跃前进。",
+    stars: "1.1k", type: "休闲", tech: "Canvas",
+    folder: "13-crossy-road", repo: "https://github.com/EvanBacon/Expo-Crossy-Road" },
+  { rank: 14, name: "俄罗斯方块", en: "Tetris", emoji: "🟦", color: "#00b4d8",
+    desc: "经典俄罗斯方块，完整实现 SRS 旋转、DAS 和锁定延迟。",
+    stars: "500", type: "经典益智", tech: "Canvas",
+    folder: "14-tetris", repo: "https://github.com/jakesgordon/javascript-tetris" },
+  { rank: 15, name: "大球吃小球", en: "Agar.io Clone", emoji: "⚪", color: "#e91e63",
+    desc: "Agar.io 风格 IO 游戏，控制细胞吞噬其他细胞壮大自己。",
+    stars: "500", type: "IO", tech: "Canvas",
+    folder: "15-agar-io", repo: "https://github.com/owenashurst/agar.io-clone" },
+  { rank: 16, name: "粒子点击器", en: "Particle Clicker", emoji: "⚛️", color: "#1a237e",
+    desc: "粒子物理主题增量游戏，经营实验室重现物理发现。",
+    stars: "660", type: "增量", tech: "JavaScript",
+    folder: "16-particle-clicker", repo: "https://github.com/particle-clicker/particle-clicker" },
+  { rank: 17, name: "贪吃蛇大作战", en: "Slither.io Clone", emoji: "🐍", color: "#00e676",
+    desc: "霓虹风格贪吃蛇 IO 游戏，吃食物变长并击败对手。",
+    stars: "400", type: "IO", tech: "Canvas",
+    folder: "17-slither-io", repo: "https://github.com/knagaitsev/slither.io-clone" },
+  { rank: 18, name: "像素鸟", en: "CrappyBird", emoji: "🐤", color: "#ffd54f",
+    desc: "极简 Flappy Bird，160 行代码的 Canvas 游戏循环入门。",
+    stars: "350", type: "动作", tech: "Canvas",
+    folder: "18-crappy-bird", repo: "https://github.com/varunpant/CrappyBird" },
+  { rank: 19, name: "吃豆人", en: "Pacman", emoji: "🟡", color: "#ffca28",
+    desc: "经典吃豆人，四种幽灵 AI、能量丸和隧道传送。",
+    stars: "300", type: "街机", tech: "Canvas",
+    folder: "19-pacman", repo: "https://github.com/daleharvey/pacman" },
+  { rank: 20, name: "文明之光", en: "Freeciv", emoji: "🏛️", color: "#4caf50",
+    desc: "简化版回合制 4X 策略游戏，建城、科技、征服。",
+    stars: "300", type: "策略", tech: "Canvas",
+    folder: "20-freeciv", repo: "https://github.com/freeciv/freeciv-web" },
+  { rank: 21, name: "沙盘世界", en: "Sand Game JS", emoji: "🌋", color: "#ff5722",
+    desc: "落沙游戏引擎，11 种元素含岩浆、酸液和冰雪物理。",
+    stars: "200", type: "沙盒模拟", tech: "Canvas",
+    folder: "21-sand-game", repo: "https://github.com/Hartrik/sand-game-js" },
+  { rank: 22, name: "麻将连连看", en: "Green Mahjong", emoji: "🀄", color: "#2e7d32",
+    desc: "传统麻将接龙，三种布局，完整中文牌面。",
+    stars: "80", type: "棋牌", tech: "CSS / JS",
+    folder: "22-green-mahjong", repo: "https://github.com/danbeck/green-mahjong" },
+  { rank: 23, name: "竞技场之战", en: "Onslaught Arena", emoji: "🗡️", color: "#795548",
+    desc: "俯视角竞技场射击，波次敌人、武器升级和 Boss 战。",
+    stars: "195", type: "射击", tech: "Canvas",
+    folder: "23-onslaught-arena", repo: "https://github.com/lostdecade/onslaught_arena" },
+  { rank: 24, name: "命令与征服", en: "Command & Conquer", emoji: "🪖", color: "#546e7a",
+    desc: "即时策略游戏，建造基地、训练士兵、指挥战斗。",
+    stars: "200", type: "RTS", tech: "Canvas",
+    folder: "24-command-and-conquer", repo: "https://github.com/adityaravishankar/command-and-conquer" },
+  { rank: 25, name: "无限马里奥", en: "Infinite Mario", emoji: "🍄", color: "#e53935",
+    desc: "超级马里奥无限版，程序化关卡、蘑菇变大、踩敌跳跃。",
+    stars: "150", type: "平台跳跃", tech: "Canvas",
+    folder: "25-infinite-mario", repo: "https://github.com/robertkleffner/mariohtml5" },
+  { rank: 26, name: "塔防战争", en: "Tower Defense", emoji: "🏰", color: "#8d6e63",
+    desc: "五种防御塔、三级升级、25 波敌人进攻的经典塔防。",
+    stars: "100", type: "塔防", tech: "Canvas",
+    folder: "26-tower-defense", repo: "https://github.com/Casmo/tower-defense" },
+  { rank: 27, name: "极速拉力赛", en: "Trigger Rally", emoji: "🏎️", color: "#ff6f00",
+    desc: "伪 3D 拉力赛车，三种主题赛道、检查点计时赛。",
+    stars: "100", type: "赛车", tech: "Canvas / 伪3D",
+    folder: "27-trigger-rally", repo: "https://github.com/CodeArtemis/TriggerRally" },
+  { rank: 28, name: "缠绕", en: "Coil", emoji: "🌀", color: "#7c4dff",
+    desc: "用轨迹包围敌人来消灭它们，霓虹发光风格休闲游戏。",
+    stars: "80", type: "休闲", tech: "Canvas",
+    folder: "28-coil", repo: "https://github.com/leereilly/Coil" },
+  { rank: 29, name: "太空入侵者", en: "Space Invaders", emoji: "👾", color: "#1b5e20",
+    desc: "经典太空入侵者，像素外星人编队、可破坏掩体和 UFO。",
+    stars: "100", type: "射击", tech: "Canvas",
+    folder: "29-space-invaders", repo: "https://github.com/dwmkerr/spaceinvaders" },
+  { rank: 30, name: "国际象棋", en: "3D Chess", emoji: "♟️", color: "#5d4037",
+    desc: "3D 透视国际象棋，完整规则和 AI 对手（Minimax 深度 3）。",
+    stars: "526", type: "棋类", tech: "CSS 3D",
+    folder: "30-3d-chess", repo: "https://github.com/juliangarnier/3D-Hartwig-chess-set" }
+];
+
+const types = ["全部", ...new Set(games.map(g => g.type))];
+
+// Render filter bar
+const filterBar = document.getElementById("filterBar");
+types.forEach((t, i) => {
+  const btn = document.createElement("button");
+  btn.className = "filter-btn" + (i === 0 ? " active" : "");
+  btn.textContent = t;
+  btn.onclick = () => {
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderGrid(t === "全部" ? null : t);
+  };
+  filterBar.appendChild(btn);
+});
+
+function renderGrid(filter) {
+  const grid = document.getElementById("grid");
+  const list = filter ? games.filter(g => g.type === filter) : games;
+  grid.innerHTML = list.map((g, i) => `
+    <div class="card" style="animation-delay:${i * 0.04}s">
+      <div class="card-banner" style="background:linear-gradient(135deg, ${g.color}, ${adjustColor(g.color, -30)})">
+        <span class="rank">#${g.rank}</span>
+        <span class="stars-badge">⭐ ${g.stars}</span>
+        <span class="emoji">${g.emoji}</span>
+      </div>
+      <div class="card-body">
+        <h3>${g.name}</h3>
+        <div class="en-name">${g.en}</div>
+        <p class="desc">${g.desc}</p>
+        <div class="card-tags">
+          <span class="tag">${g.type}</span>
+          <span class="tag">${g.tech}</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a class="btn-play" href="${g.folder}/index.html">▶ 开始游戏</a>
+        <a class="btn-github" href="${g.repo}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  `).join("");
+}
+
+function adjustColor(hex, amount) {
+  hex = hex.replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+  const num = parseInt(hex, 16);
+  let r = Math.min(255, Math.max(0, (num >> 16) + amount));
+  let g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount));
+  let b = Math.min(255, Math.max(0, (num & 0xff) + amount));
+  return `rgb(${r},${g},${b})`;
+}
+
+renderGrid(null);
+</script>
+</body>
+</html>

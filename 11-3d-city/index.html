@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>模拟城市</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
+    overflow: hidden;
+    user-select: none;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#top-bar {
+    background: linear-gradient(180deg, #16213e, #0f3460);
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #e94560;
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+#top-bar h1 {
+    font-size: 22px;
+    color: #e94560;
+    text-shadow: 0 0 10px rgba(233,69,96,0.5);
+    letter-spacing: 4px;
+}
+
+#stats {
+    display: flex;
+    gap: 24px;
+    font-size: 14px;
+}
+
+.stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.05);
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.stat-icon {
+    font-size: 18px;
+}
+
+.stat-label {
+    color: #aaa;
+    font-size: 12px;
+}
+
+.stat-value {
+    color: #fff;
+    font-weight: bold;
+    font-size: 14px;
+    min-width: 50px;
+}
+
+#main-area {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+#toolbar {
+    width: 200px;
+    background: linear-gradient(180deg, #16213e, #1a1a2e);
+    border-right: 2px solid #0f3460;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+#toolbar h3 {
+    color: #e94560;
+    font-size: 14px;
+    margin-bottom: 4px;
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+.tool-section {
+    margin-bottom: 8px;
+}
+
+.tool-section-title {
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 4px;
+    padding-left: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.03);
+    color: #e0e0e0;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    transition: all 0.15s;
+}
+
+.tool-btn:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.2);
+}
+
+.tool-btn.active {
+    background: rgba(233,69,96,0.15);
+    border-color: #e94560;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(233,69,96,0.2);
+}
+
+.tool-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.2);
+    flex-shrink: 0;
+}
+
+.tool-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.tool-name {
+    font-size: 13px;
+}
+
+.tool-cost {
+    font-size: 10px;
+    color: #aaa;
+}
+
+#canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #0a0a1a;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#info-panel {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(22,33,62,0.92);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: #ccc;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 5;
+    backdrop-filter: blur(4px);
+}
+
+#hover-info {
+    position: absolute;
+    background: rgba(22,33,62,0.95);
+    border: 1px solid rgba(233,69,96,0.4);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #e0e0e0;
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+    backdrop-filter: blur(4px);
+    max-width: 200px;
+}
+
+#speed-controls {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 4px;
+    z-index: 10;
+}
+
+.speed-btn {
+    padding: 4px 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    background: rgba(22,33,62,0.9);
+    color: #ccc;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.15s;
+}
+
+.speed-btn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.speed-btn.active {
+    background: rgba(233,69,96,0.3);
+    border-color: #e94560;
+    color: #fff;
+}
+
+#zoom-controls {
+    position: absolute;
+    bottom: 60px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 10;
+}
+
+.zoom-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 4px;
+    background: rgba(22,33,62,0.9);
+    color: #ccc;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    font-family: inherit;
+}
+
+.zoom-btn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+#minimap {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    z-index: 10;
+    background: rgba(10,10,26,0.9);
+    cursor: pointer;
+}
+
+#notification {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-60px);
+    background: rgba(233,69,96,0.9);
+    color: #fff;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 30;
+    transition: transform 0.3s ease;
+    pointer-events: none;
+}
+
+#notification.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+</style>
+</head>
+<body>
+
+<div id="top-bar">
+    <h1>模拟城市</h1>
+    <div id="stats">
+        <div class="stat">
+            <span class="stat-icon">💰</span>
+            <div>
+                <div class="stat-label">资金</div>
+                <div class="stat-value" id="stat-money">10000</div>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-icon">👥</span>
+            <div>
+                <div class="stat-label">人口</div>
+                <div class="stat-value" id="stat-population">0</div>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-icon">😊</span>
+            <div>
+                <div class="stat-label">幸福度</div>
+                <div class="stat-value" id="stat-happiness">50%</div>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-icon">⚡</span>
+            <div>
+                <div class="stat-label">电力</div>
+                <div class="stat-value" id="stat-power">0/0</div>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-icon">💧</span>
+            <div>
+                <div class="stat-label">供水</div>
+                <div class="stat-value" id="stat-water">0/0</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="main-area">
+    <div id="toolbar">
+        <h3>🏗️ 建造面板</h3>
+
+        <div class="tool-section">
+            <div class="tool-section-title">住宅区</div>
+            <button class="tool-btn" data-tool="residential" onclick="selectTool('residential')">
+                <div class="tool-color" style="background:#4a9eff"></div>
+                <div class="tool-info">
+                    <span class="tool-name">住宅楼</span>
+                    <span class="tool-cost">💰 100</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="tool-section">
+            <div class="tool-section-title">商业区</div>
+            <button class="tool-btn" data-tool="commercial" onclick="selectTool('commercial')">
+                <div class="tool-color" style="background:#f0c040"></div>
+                <div class="tool-info">
+                    <span class="tool-name">商业中心</span>
+                    <span class="tool-cost">💰 150</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="tool-section">
+            <div class="tool-section-title">工业区</div>
+            <button class="tool-btn" data-tool="industrial" onclick="selectTool('industrial')">
+                <div class="tool-color" style="background:#888"></div>
+                <div class="tool-info">
+                    <span class="tool-name">工厂</span>
+                    <span class="tool-cost">💰 200</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="tool-section">
+            <div class="tool-section-title">基础设施</div>
+            <button class="tool-btn" data-tool="road" onclick="selectTool('road')">
+                <div class="tool-color" style="background:#555"></div>
+                <div class="tool-info">
+                    <span class="tool-name">道路</span>
+                    <span class="tool-cost">💰 20</span>
+                </div>
+            </button>
+            <button class="tool-btn" data-tool="powerplant" onclick="selectTool('powerplant')">
+                <div class="tool-color" style="background:#e94560"></div>
+                <div class="tool-info">
+                    <span class="tool-name">发电厂</span>
+                    <span class="tool-cost">💰 500</span>
+                </div>
+            </button>
+            <button class="tool-btn" data-tool="watertower" onclick="selectTool('watertower')">
+                <div class="tool-color" style="background:#00bcd4"></div>
+                <div class="tool-info">
+                    <span class="tool-name">水塔</span>
+                    <span class="tool-cost">💰 300</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="tool-section">
+            <div class="tool-section-title">公共设施</div>
+            <button class="tool-btn" data-tool="park" onclick="selectTool('park')">
+                <div class="tool-color" style="background:#4caf50"></div>
+                <div class="tool-info">
+                    <span class="tool-name">公园</span>
+                    <span class="tool-cost">💰 80</span>
+                </div>
+            </button>
+        </div>
+
+        <div class="tool-section">
+            <div class="tool-section-title">工具</div>
+            <button class="tool-btn" data-tool="demolish" onclick="selectTool('demolish')">
+                <div class="tool-color" style="background:#ff1744; display:flex; align-items:center; justify-content:center; font-size:14px; color:#fff;">✕</div>
+                <div class="tool-info">
+                    <span class="tool-name">拆除</span>
+                    <span class="tool-cost">💰 10</span>
+                </div>
+            </button>
+        </div>
+
+        <div style="margin-top:auto; padding-top:12px; border-top:1px solid rgba(255,255,255,0.1);">
+            <div style="font-size:11px; color:#666; text-align:center; line-height:1.6;">
+                <div>🖱️ 左键放置建筑</div>
+                <div>🖱️ 右键拖拽移动</div>
+                <div>🔄 滚轮缩放</div>
+                <div>⌨️ ESC 取消选择</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="game-canvas"></canvas>
+
+        <div id="speed-controls">
+            <button class="speed-btn" onclick="setSpeed(0)">⏸ 暂停</button>
+            <button class="speed-btn active" onclick="setSpeed(1)">▶ 正常</button>
+            <button class="speed-btn" onclick="setSpeed(2)">▶▶ 加速</button>
+            <button class="speed-btn" onclick="setSpeed(3)">▶▶▶ 极速</button>
+        </div>
+
+        <div id="zoom-controls">
+            <button class="zoom-btn" onclick="zoomIn()">+</button>
+            <button class="zoom-btn" onclick="zoomOut()">−</button>
+        </div>
+
+        <canvas id="minimap" width="150" height="150"></canvas>
+
+        <div id="info-panel">
+            <span id="info-text">选择建筑类型，然后点击地图放置</span>
+        </div>
+
+        <div id="hover-info"></div>
+
+        <div id="notification"></div>
+    </div>
+</div>
+
+<script>
+// ==================== GAME CONFIGURATION ====================
+const GRID_SIZE = 24;
+const TILE_W = 64;
+const TILE_H = 32;
+
+const BUILDING_TYPES = {
+    residential: {
+        name: '住宅楼', cost: 100, color: '#4a9eff', topColor: '#3a8eef',
+        sideColor: '#2a6ecf', sideColor2: '#2060b8',
+        height: 40, population: 20, powerUse: 2, waterUse: 2,
+        taxIncome: 8, pollutionRadius: 0, happinessBonus: 0
+    },
+    commercial: {
+        name: '商业中心', cost: 150, color: '#f0c040', topColor: '#e0b030',
+        sideColor: '#c89828', sideColor2: '#b08020',
+        height: 50, population: 5, powerUse: 3, waterUse: 1,
+        taxIncome: 15, pollutionRadius: 0, happinessBonus: 2
+    },
+    industrial: {
+        name: '工厂', cost: 200, color: '#999', topColor: '#888',
+        sideColor: '#666', sideColor2: '#555',
+        height: 35, population: 10, powerUse: 5, waterUse: 3,
+        taxIncome: 20, pollutionRadius: 3, happinessBonus: -5
+    },
+    road: {
+        name: '道路', cost: 20, color: '#555', topColor: '#4a4a4a',
+        sideColor: '#333', sideColor2: '#2a2a2a',
+        height: 2, population: 0, powerUse: 0, waterUse: 0,
+        taxIncome: 0, pollutionRadius: 0, happinessBonus: 0
+    },
+    park: {
+        name: '公园', cost: 80, color: '#4caf50', topColor: '#43a047',
+        sideColor: '#2e7d32', sideColor2: '#256628',
+        height: 5, population: 0, powerUse: 0, waterUse: 1,
+        taxIncome: 0, pollutionRadius: 0, happinessBonus: 10
+    },
+    powerplant: {
+        name: '发电厂', cost: 500, color: '#e94560', topColor: '#d93550',
+        sideColor: '#b92040', sideColor2: '#a01838',
+        height: 55, population: 5, powerUse: -50, waterUse: 5,
+        taxIncome: 0, pollutionRadius: 4, happinessBonus: -8
+    },
+    watertower: {
+        name: '水塔', cost: 300, color: '#00bcd4', topColor: '#00acc1',
+        sideColor: '#0097a7', sideColor2: '#00838f',
+        height: 60, population: 2, powerUse: 1, waterUse: -40,
+        taxIncome: 0, pollutionRadius: 0, happinessBonus: 0
+    }
+};
+
+// ==================== GAME STATE ====================
+let grid = [];
+let money = 10000;
+let population = 0;
+let happiness = 50;
+let totalPowerSupply = 0;
+let totalPowerDemand = 0;
+let totalWaterSupply = 0;
+let totalWaterDemand = 0;
+
+let selectedTool = null;
+let gameSpeed = 1;
+let tickCounter = 0;
+
+// Camera state
+let camera = { x: 0, y: 0, zoom: 1.0 };
+let isDragging = false;
+let dragStart = { x: 0, y: 0 };
+let cameraStart = { x: 0, y: 0 };
+
+let hoverTile = { x: -1, y: -1 };
+let mousePos = { x: 0, y: 0 };
+
+// Canvas references
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas.getContext('2d');
+
+// ==================== INITIALIZATION ====================
+function initGrid() {
+    grid = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+        grid[y] = [];
+        for (let x = 0; x < GRID_SIZE; x++) {
+            grid[y][x] = {
+                type: null,
+                level: 1,
+                age: 0
+            };
+        }
+    }
+}
+
+function resizeCanvas() {
+    const container = document.getElementById('canvas-container');
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+}
+
+function centerCamera() {
+    const container = document.getElementById('canvas-container');
+    const centerIsoX = (GRID_SIZE / 2) * TILE_W / 2;
+    const centerIsoY = (GRID_SIZE / 2) * TILE_H / 2;
+    camera.x = container.clientWidth / 2 - centerIsoX;
+    camera.y = container.clientHeight / 2 - centerIsoY * 0.3;
+}
+
+// ==================== COORDINATE CONVERSION ====================
+function gridToIso(gx, gy) {
+    return {
+        x: (gx - gy) * (TILE_W / 2),
+        y: (gx + gy) * (TILE_H / 2)
+    };
+}
+
+function screenToGrid(sx, sy) {
+    const wx = (sx - camera.x) / camera.zoom;
+    const wy = (sy - camera.y) / camera.zoom;
+    const gx = (wx / (TILE_W / 2) + wy / (TILE_H / 2)) / 2;
+    const gy = (wy / (TILE_H / 2) - wx / (TILE_W / 2)) / 2;
+    return { x: Math.floor(gx), y: Math.floor(gy) };
+}
+
+function gridToScreen(gx, gy) {
+    const iso = gridToIso(gx, gy);
+    return {
+        x: iso.x * camera.zoom + camera.x,
+        y: iso.y * camera.zoom + camera.y
+    };
+}
+
+// ==================== RENDERING ====================
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(camera.x, camera.y);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    // Draw grid and buildings back to front
+    for (let gy = 0; gy < GRID_SIZE; gy++) {
+        for (let gx = 0; gx < GRID_SIZE; gx++) {
+            const iso = gridToIso(gx, gy);
+            const tile = grid[gy][gx];
+            drawTileBase(iso.x, iso.y, gx, gy, tile);
+            if (tile.type) {
+                drawBuilding(iso.x, iso.y, tile);
+            }
+        }
+    }
+
+    // Draw hover highlight
+    if (hoverTile.x >= 0 && hoverTile.x < GRID_SIZE && hoverTile.y >= 0 && hoverTile.y < GRID_SIZE) {
+        const iso = gridToIso(hoverTile.x, hoverTile.y);
+        drawTileHighlight(iso.x, iso.y);
+    }
+
+    ctx.restore();
+}
+
+function drawTileBase(x, y, gx, gy, tile) {
+    const hw = TILE_W / 2;
+    const hh = TILE_H / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + hw, y + hh);
+    ctx.lineTo(x, y + TILE_H);
+    ctx.lineTo(x - hw, y + hh);
+    ctx.closePath();
+
+    // Checkerboard ground
+    if (tile.type === null) {
+        const light = (gx + gy) % 2 === 0;
+        ctx.fillStyle = light ? '#2a4a2a' : '#264426';
+    } else if (tile.type === 'road') {
+        ctx.fillStyle = '#3a3a3a';
+    } else {
+        const light = (gx + gy) % 2 === 0;
+        ctx.fillStyle = light ? '#2a4a2a' : '#264426';
+    }
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+}
+
+function drawBuilding(x, y, tile) {
+    const bt = BUILDING_TYPES[tile.type];
+    if (!bt) return;
+
+    const hw = TILE_W / 2;
+    const hh = TILE_H / 2;
+    const h = bt.height * (0.8 + tile.level * 0.2);
+
+    if (tile.type === 'road') {
+        drawRoad(x, y);
+        return;
+    }
+
+    if (tile.type === 'park') {
+        drawPark(x, y);
+        return;
+    }
+
+    // 3D block building
+    // Top face
+    ctx.beginPath();
+    ctx.moveTo(x, y - h);
+    ctx.lineTo(x + hw, y + hh - h);
+    ctx.lineTo(x, y + TILE_H - h);
+    ctx.lineTo(x - hw, y + hh - h);
+    ctx.closePath();
+    ctx.fillStyle = bt.topColor;
+    ctx.fill();
+
+    // Left face
+    ctx.beginPath();
+    ctx.moveTo(x - hw, y + hh - h);
+    ctx.lineTo(x, y + TILE_H - h);
+    ctx.lineTo(x, y + TILE_H);
+    ctx.lineTo(x - hw, y + hh);
+    ctx.closePath();
+    ctx.fillStyle = bt.sideColor;
+    ctx.fill();
+
+    // Right face
+    ctx.beginPath();
+    ctx.moveTo(x + hw, y + hh - h);
+    ctx.lineTo(x, y + TILE_H - h);
+    ctx.lineTo(x, y + TILE_H);
+    ctx.lineTo(x + hw, y + hh);
+    ctx.closePath();
+    ctx.fillStyle = bt.sideColor2;
+    ctx.fill();
+
+    // Windows for tall buildings
+    if (h > 10) {
+        drawWindows(x, y, h, hw, hh, tile.type);
+    }
+
+    // Special decorations
+    if (tile.type === 'powerplant') {
+        drawChimney(x, y, h);
+    } else if (tile.type === 'watertower') {
+        drawWaterTank(x, y, h);
+    }
+
+    // Edge lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 0.5;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y - h);
+    ctx.lineTo(x + hw, y + hh - h);
+    ctx.lineTo(x + hw, y + hh);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x, y - h);
+    ctx.lineTo(x - hw, y + hh - h);
+    ctx.lineTo(x - hw, y + hh);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x, y + TILE_H - h);
+    ctx.lineTo(x, y + TILE_H);
+    ctx.stroke();
+}
+
+function drawWindows(x, y, h, hw, hh, type) {
+    const floors = Math.floor(h / 12);
+    const windowColor = type === 'industrial' ? 'rgba(255,200,50,0.3)' : 'rgba(255,255,200,0.6)';
+
+    // Left face windows
+    for (let f = 0; f < floors; f++) {
+        const fy = y + TILE_H - (f + 1) * 12 + 2;
+        for (let w = 0; w < 2; w++) {
+            const t = (w + 1) / 3;
+            const wx = x - hw * (1 - t);
+            const wy = fy - hh * t + hh;
+            ctx.fillStyle = windowColor;
+            ctx.fillRect(wx - 2, wy - 3, 4, 5);
+        }
+    }
+
+    // Right face windows
+    for (let f = 0; f < floors; f++) {
+        const fy = y + TILE_H - (f + 1) * 12 + 2;
+        for (let w = 0; w < 2; w++) {
+            const t = (w + 1) / 3;
+            const wx = x + hw * t;
+            const wy = fy + hh * t - hh + hh;
+            ctx.fillStyle = windowColor;
+            ctx.fillRect(wx - 2, wy - 3, 4, 5);
+        }
+    }
+}
+
+function drawRoad(x, y) {
+    const hw = TILE_W / 2;
+    const hh = TILE_H / 2;
+
+    // Road surface
+    ctx.beginPath();
+    ctx.moveTo(x, y + 1);
+    ctx.lineTo(x + hw, y + hh + 1);
+    ctx.lineTo(x, y + TILE_H + 1);
+    ctx.lineTo(x - hw, y + hh + 1);
+    ctx.closePath();
+    ctx.fillStyle = '#444';
+    ctx.fill();
+
+    // Road marking
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x - hw * 0.5, y + hh * 0.5 + 1);
+    ctx.lineTo(x + hw * 0.5, y + hh * 1.5 + 1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + hw * 0.5, y + hh * 0.5 + 1);
+    ctx.lineTo(x - hw * 0.5, y + hh * 1.5 + 1);
+    ctx.stroke();
+    ctx.setLineDash([]);
+}
+
+function drawPark(x, y) {
+    const hw = TILE_W / 2;
+    const hh = TILE_H / 2;
+
+    // Green grass base
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + hw, y + hh);
+    ctx.lineTo(x, y + TILE_H);
+    ctx.lineTo(x - hw, y + hh);
+    ctx.closePath();
+    ctx.fillStyle = '#3d8b40';
+    ctx.fill();
+
+    // Trees
+    const treePositions = [
+        { tx: 0, ty: -8 },
+        { tx: -8, ty: -2 },
+        { tx: 8, ty: -2 },
+        { tx: 0, ty: 4 }
+    ];
+
+    for (const tp of treePositions) {
+        // Tree trunk
+        ctx.fillStyle = '#5d4037';
+        ctx.fillRect(x + tp.tx - 1, y + hh + tp.ty - 8, 2, 8);
+        // Tree top (circle)
+        ctx.beginPath();
+        ctx.arc(x + tp.tx, y + hh + tp.ty - 11, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#2e7d32';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x + tp.tx - 2, y + hh + tp.ty - 13, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#388e3c';
+        ctx.fill();
+    }
+}
+
+function drawChimney(x, y, h) {
+    const chimneyH = 20;
+    const baseY = y - h;
+
+    // Chimney body
+    ctx.fillStyle = '#777';
+    ctx.fillRect(x + 6, baseY - chimneyH, 6, chimneyH);
+    ctx.fillStyle = '#666';
+    ctx.fillRect(x + 12, baseY - chimneyH, 2, chimneyH);
+
+    // Smoke
+    const time = Date.now() / 1000;
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 3; i++) {
+        const sy = baseY - chimneyH - 8 - i * 10 + Math.sin(time + i) * 3;
+        const sx = x + 9 + Math.cos(time * 0.7 + i) * 4 + i * 2;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4 + i * 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#aaa';
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+}
+
+function drawWaterTank(x, y, h) {
+    const baseY = y - h;
+
+    // Tank dome on top
+    ctx.beginPath();
+    ctx.ellipse(x, baseY - 5, 10, 6, 0, Math.PI, 0);
+    ctx.fillStyle = '#0097a7';
+    ctx.fill();
+
+    // Water level indicator
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(x - 1, baseY + 5, 2, h * 0.4);
+}
+
+function drawTileHighlight(x, y) {
+    const hw = TILE_W / 2;
+    const hh = TILE_H / 2;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + hw, y + hh);
+    ctx.lineTo(x, y + TILE_H);
+    ctx.lineTo(x - hw, y + hh);
+    ctx.closePath();
+
+    if (selectedTool === 'demolish') {
+        ctx.fillStyle = 'rgba(255,23,68,0.3)';
+        ctx.strokeStyle = 'rgba(255,23,68,0.8)';
+    } else if (selectedTool) {
+        const canPlace = canPlaceBuilding(hoverTile.x, hoverTile.y);
+        if (canPlace) {
+            ctx.fillStyle = 'rgba(76,175,80,0.3)';
+            ctx.strokeStyle = 'rgba(76,175,80,0.8)';
+        } else {
+            ctx.fillStyle = 'rgba(255,23,68,0.3)';
+            ctx.strokeStyle = 'rgba(255,23,68,0.8)';
+        }
+    } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    }
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+}
+
+// ==================== MINIMAP ====================
+function renderMinimap() {
+    const mmW = minimapCanvas.width;
+    const mmH = minimapCanvas.height;
+    minimapCtx.clearRect(0, 0, mmW, mmH);
+
+    minimapCtx.fillStyle = 'rgba(20,30,20,0.9)';
+    minimapCtx.fillRect(0, 0, mmW, mmH);
+
+    const scale = mmW / GRID_SIZE;
+
+    for (let gy = 0; gy < GRID_SIZE; gy++) {
+        for (let gx = 0; gx < GRID_SIZE; gx++) {
+            const tile = grid[gy][gx];
+            if (tile.type) {
+                const bt = BUILDING_TYPES[tile.type];
+                minimapCtx.fillStyle = bt.color;
+            } else {
+                minimapCtx.fillStyle = '#1a2e1a';
+            }
+            minimapCtx.fillRect(gx * scale, gy * scale, scale, scale);
+        }
+    }
+
+    // Viewport indicator
+    const container = document.getElementById('canvas-container');
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+
+    // Approximate viewport bounds in grid coords
+    const topLeft = screenToGrid(0, 0);
+    const bottomRight = screenToGrid(cw, ch);
+    const vx = Math.max(0, topLeft.x) * scale;
+    const vy = Math.max(0, topLeft.y) * scale;
+    const vw = Math.min(GRID_SIZE, bottomRight.x - topLeft.x) * scale;
+    const vh = Math.min(GRID_SIZE, bottomRight.y - topLeft.y) * scale;
+
+    minimapCtx.strokeStyle = '#e94560';
+    minimapCtx.lineWidth = 1.5;
+    minimapCtx.strokeRect(vx, vy, vw, vh);
+}
+
+// ==================== GAME LOGIC ====================
+function canPlaceBuilding(gx, gy) {
+    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) return false;
+    if (grid[gy][gx].type !== null) return false;
+    if (!selectedTool || selectedTool === 'demolish') return false;
+    if (money < BUILDING_TYPES[selectedTool].cost) return false;
+    return true;
+}
+
+function placeBuilding(gx, gy) {
+    if (selectedTool === 'demolish') {
+        if (gx >= 0 && gx < GRID_SIZE && gy >= 0 && gy < GRID_SIZE && grid[gy][gx].type !== null) {
+            if (money < 10) {
+                showNotification('资金不足！无法拆除');
+                return;
+            }
+            money -= 10;
+            grid[gy][gx] = { type: null, level: 1, age: 0 };
+            recalcStats();
+            showNotification('建筑已拆除');
+        }
+        return;
+    }
+
+    if (!canPlaceBuilding(gx, gy)) {
+        if (gx >= 0 && gx < GRID_SIZE && gy >= 0 && gy < GRID_SIZE && grid[gy][gx].type !== null) {
+            showNotification('该位置已有建筑！');
+        } else if (selectedTool && money < BUILDING_TYPES[selectedTool].cost) {
+            showNotification('资金不足！');
+        }
+        return;
+    }
+
+    const bt = BUILDING_TYPES[selectedTool];
+    money -= bt.cost;
+    grid[gy][gx] = {
+        type: selectedTool,
+        level: 1,
+        age: 0
+    };
+    recalcStats();
+    showNotification(`已建造${bt.name}，花费 💰${bt.cost}`);
+}
+
+function recalcStats() {
+    let newPop = 0;
+    let newHappiness = 50;
+    let powerSupply = 0;
+    let powerDemand = 0;
+    let waterSupply = 0;
+    let waterDemand = 0;
+    let parkBonus = 0;
+    let pollutionPenalty = 0;
+    let commerceBonus = 0;
+
+    // Calculate pollution map
+    const pollutionMap = [];
+    for (let y = 0; y < GRID_SIZE; y++) {
+        pollutionMap[y] = [];
+        for (let x = 0; x < GRID_SIZE; x++) {
+            pollutionMap[y][x] = 0;
+        }
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+            const tile = grid[y][x];
+            if (!tile.type) continue;
+            const bt = BUILDING_TYPES[tile.type];
+            if (bt.pollutionRadius > 0) {
+                const r = bt.pollutionRadius;
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        const ny = y + dy, nx = x + dx;
+                        if (ny >= 0 && ny < GRID_SIZE && nx >= 0 && nx < GRID_SIZE) {
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist <= r) {
+                                pollutionMap[ny][nx] += (1 - dist / r) * 10;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+            const tile = grid[y][x];
+            if (!tile.type) continue;
+            const bt = BUILDING_TYPES[tile.type];
+
+            // Population
+            newPop += bt.population * tile.level;
+
+            // Power
+            if (bt.powerUse < 0) {
+                powerSupply += -bt.powerUse;
+            } else {
+                powerDemand += bt.powerUse;
+            }
+
+            // Water
+            if (bt.waterUse < 0) {
+                waterSupply += -bt.waterUse;
+            } else {
+                waterDemand += bt.waterUse;
+            }
+
+            // Happiness bonuses
+            if (bt.happinessBonus > 0) {
+                parkBonus += bt.happinessBonus;
+            }
+            if (bt.happinessBonus < 0) {
+                pollutionPenalty += -bt.happinessBonus;
+            }
+
+            // Commerce bonus
+            if (tile.type === 'commercial') {
+                commerceBonus += 3;
+            }
+        }
+    }
+
+    // Calculate happiness
+    newHappiness = 50 + parkBonus + commerceBonus - pollutionPenalty;
+
+    // Power/water shortages reduce happiness
+    if (powerDemand > 0 && powerSupply < powerDemand) {
+        newHappiness -= 15;
+    }
+    if (waterDemand > 0 && waterSupply < waterDemand) {
+        newHappiness -= 15;
+    }
+
+    newHappiness = Math.max(0, Math.min(100, Math.round(newHappiness)));
+
+    population = newPop;
+    happiness = newHappiness;
+    totalPowerSupply = powerSupply;
+    totalPowerDemand = powerDemand;
+    totalWaterSupply = waterSupply;
+    totalWaterDemand = waterDemand;
+
+    updateStatsUI();
+}
+
+function simulationTick() {
+    if (gameSpeed === 0) return;
+
+    tickCounter++;
+
+    // Income from taxes
+    let income = 0;
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+            const tile = grid[y][x];
+            if (!tile.type) continue;
+            const bt = BUILDING_TYPES[tile.type];
+            income += bt.taxIncome * tile.level;
+            tile.age++;
+        }
+    }
+
+    // Maintenance costs
+    let maintenance = 0;
+    for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+            const tile = grid[y][x];
+            if (!tile.type) continue;
+            if (tile.type === 'powerplant') maintenance += 10;
+            else if (tile.type === 'watertower') maintenance += 5;
+            else if (tile.type === 'road') maintenance += 1;
+        }
+    }
+
+    // Happiness affects income
+    const happinessMultiplier = 0.5 + (happiness / 100) * 1.0;
+    money += Math.round((income - maintenance) * happinessMultiplier);
+    money = Math.max(0, money);
+
+    // Level up buildings based on age and happiness
+    if (tickCounter % 10 === 0) {
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                const tile = grid[y][x];
+                if (!tile.type) continue;
+                if (tile.type === 'road' || tile.type === 'park') continue;
+                if (tile.age > 50 && tile.level < 3 && happiness > 40) {
+                    if (Math.random() < 0.1) {
+                        tile.level++;
+                    }
+                }
+            }
+        }
+    }
+
+    // Population growth
+    if (tickCounter % 5 === 0) {
+        let hasRoad = false;
+        let hasPower = totalPowerSupply >= totalPowerDemand;
+        let hasWater = totalWaterSupply >= totalWaterDemand;
+        for (let y = 0; y < GRID_SIZE; y++) {
+            for (let x = 0; x < GRID_SIZE; x++) {
+                if (grid[y][x].type === 'road') { hasRoad = true; break; }
+            }
+            if (hasRoad) break;
+        }
+
+        if (hasRoad && hasPower && hasWater && happiness > 30) {
+            // Spontaneous residential growth on empty tiles next to roads
+            if (Math.random() < 0.05 * (happiness / 100)) {
+                const candidates = [];
+                for (let y = 0; y < GRID_SIZE; y++) {
+                    for (let x = 0; x < GRID_SIZE; x++) {
+                        if (grid[y][x].type !== null) continue;
+                        // Check adjacent for road
+                        const neighbors = [
+                            [x-1,y],[x+1,y],[x,y-1],[x,y+1]
+                        ];
+                        for (const [nx, ny] of neighbors) {
+                            if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+                                if (grid[ny][nx].type === 'road') {
+                                    candidates.push({x, y});
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (candidates.length > 0 && money > 500) {
+                    // No auto-build, just show growth indicator
+                }
+            }
+        }
+    }
+
+    recalcStats();
+}
+
+// ==================== UI ====================
+function updateStatsUI() {
+    document.getElementById('stat-money').textContent = money.toLocaleString();
+    document.getElementById('stat-population').textContent = population.toLocaleString();
+    document.getElementById('stat-happiness').textContent = happiness + '%';
+
+    const powerEl = document.getElementById('stat-power');
+    powerEl.textContent = `${totalPowerDemand}/${totalPowerSupply}`;
+    powerEl.style.color = totalPowerDemand > totalPowerSupply ? '#ff5252' : '#fff';
+
+    const waterEl = document.getElementById('stat-water');
+    waterEl.textContent = `${totalWaterDemand}/${totalWaterSupply}`;
+    waterEl.style.color = totalWaterDemand > totalWaterSupply ? '#ff5252' : '#fff';
+}
+
+function selectTool(tool) {
+    selectedTool = (selectedTool === tool) ? null : tool;
+
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tool === selectedTool);
+    });
+
+    if (selectedTool) {
+        if (selectedTool === 'demolish') {
+            document.getElementById('info-text').textContent = '🔨 拆除模式 - 点击建筑进行拆除';
+        } else {
+            const bt = BUILDING_TYPES[selectedTool];
+            document.getElementById('info-text').textContent = `正在放置: ${bt.name} | 费用: 💰${bt.cost}`;
+        }
+        canvas.style.cursor = 'pointer';
+    } else {
+        document.getElementById('info-text').textContent = '选择建筑类型，然后点击地图放置';
+        canvas.style.cursor = 'default';
+    }
+}
+
+function setSpeed(speed) {
+    gameSpeed = speed;
+    document.querySelectorAll('.speed-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i === speed);
+    });
+}
+
+function zoomIn() {
+    const container = document.getElementById('canvas-container');
+    const cx = container.clientWidth / 2;
+    const cy = container.clientHeight / 2;
+    zoomAt(cx, cy, 1.2);
+}
+
+function zoomOut() {
+    const container = document.getElementById('canvas-container');
+    const cx = container.clientWidth / 2;
+    const cy = container.clientHeight / 2;
+    zoomAt(cx, cy, 1 / 1.2);
+}
+
+function zoomAt(sx, sy, factor) {
+    const oldZoom = camera.zoom;
+    camera.zoom = Math.max(0.3, Math.min(3.0, camera.zoom * factor));
+    const zoomChange = camera.zoom / oldZoom;
+    camera.x = sx - (sx - camera.x) * zoomChange;
+    camera.y = sy - (sy - camera.y) * zoomChange;
+}
+
+let notificationTimeout = null;
+function showNotification(msg) {
+    const el = document.getElementById('notification');
+    el.textContent = msg;
+    el.classList.add('show');
+    if (notificationTimeout) clearTimeout(notificationTimeout);
+    notificationTimeout = setTimeout(() => {
+        el.classList.remove('show');
+    }, 2000);
+}
+
+function updateHoverInfo(gx, gy) {
+    const hoverEl = document.getElementById('hover-info');
+
+    if (gx < 0 || gx >= GRID_SIZE || gy < 0 || gy >= GRID_SIZE) {
+        hoverEl.style.display = 'none';
+        return;
+    }
+
+    const tile = grid[gy][gx];
+    if (!tile.type) {
+        hoverEl.style.display = 'none';
+        return;
+    }
+
+    const bt = BUILDING_TYPES[tile.type];
+    let html = `<div style="font-weight:bold;margin-bottom:4px;color:${bt.color}">${bt.name}</div>`;
+    html += `<div>等级: ${tile.level}</div>`;
+    if (bt.population > 0) html += `<div>人口: ${bt.population * tile.level}</div>`;
+    if (bt.taxIncome > 0) html += `<div>税收: 💰${bt.taxIncome * tile.level}/周期</div>`;
+    if (bt.powerUse < 0) html += `<div>发电: ⚡${-bt.powerUse}</div>`;
+    else if (bt.powerUse > 0) html += `<div>耗电: ⚡${bt.powerUse}</div>`;
+    if (bt.waterUse < 0) html += `<div>供水: 💧${-bt.waterUse}</div>`;
+    else if (bt.waterUse > 0) html += `<div>耗水: 💧${bt.waterUse}</div>`;
+    if (bt.pollutionRadius > 0) html += `<div style="color:#ff5252">污染半径: ${bt.pollutionRadius}</div>`;
+    if (bt.happinessBonus > 0) html += `<div style="color:#4caf50">幸福度: +${bt.happinessBonus}</div>`;
+    if (bt.happinessBonus < 0) html += `<div style="color:#ff5252">幸福度: ${bt.happinessBonus}</div>`;
+    html += `<div style="color:#888;font-size:10px;margin-top:2px">坐标: (${gx}, ${gy})</div>`;
+
+    hoverEl.innerHTML = html;
+    hoverEl.style.display = 'block';
+    hoverEl.style.left = (mousePos.x + 16) + 'px';
+    hoverEl.style.top = (mousePos.y - 10) + 'px';
+
+    // Keep within viewport
+    const rect = hoverEl.getBoundingClientRect();
+    const container = document.getElementById('canvas-container').getBoundingClientRect();
+    if (rect.right > container.right) {
+        hoverEl.style.left = (mousePos.x - rect.width - 16) + 'px';
+    }
+    if (rect.bottom > container.bottom) {
+        hoverEl.style.top = (mousePos.y - rect.height - 10) + 'px';
+    }
+}
+
+// ==================== EVENT HANDLERS ====================
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 2 || (e.button === 0 && !selectedTool)) {
+        isDragging = true;
+        dragStart.x = e.clientX;
+        dragStart.y = e.clientY;
+        cameraStart.x = camera.x;
+        cameraStart.y = camera.y;
+        canvas.style.cursor = 'grabbing';
+        e.preventDefault();
+        return;
+    }
+
+    if (e.button === 0 && selectedTool) {
+        const rect = canvas.getBoundingClientRect();
+        const g = screenToGrid(e.clientX - rect.left, e.clientY - rect.top);
+        placeBuilding(g.x, g.y);
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+
+    // Store mouse position relative to canvas container
+    const containerRect = document.getElementById('canvas-container').getBoundingClientRect();
+    mousePos.x = e.clientX - containerRect.left;
+    mousePos.y = e.clientY - containerRect.top;
+
+    if (isDragging) {
+        camera.x = cameraStart.x + (e.clientX - dragStart.x);
+        camera.y = cameraStart.y + (e.clientY - dragStart.y);
+        return;
+    }
+
+    const g = screenToGrid(sx, sy);
+    hoverTile.x = g.x;
+    hoverTile.y = g.y;
+
+    updateHoverInfo(g.x, g.y);
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    if (isDragging) {
+        isDragging = false;
+        canvas.style.cursor = selectedTool ? 'pointer' : 'default';
+    }
+});
+
+canvas.addEventListener('mouseleave', () => {
+    hoverTile.x = -1;
+    hoverTile.y = -1;
+    document.getElementById('hover-info').style.display = 'none';
+    if (isDragging) {
+        isDragging = false;
+        canvas.style.cursor = selectedTool ? 'pointer' : 'default';
+    }
+});
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    zoomAt(sx, sy, factor);
+}, { passive: false });
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Minimap click to navigate
+minimapCanvas.addEventListener('mousedown', (e) => {
+    const rect = minimapCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const scale = minimapCanvas.width / GRID_SIZE;
+    const gx = mx / scale;
+    const gy = my / scale;
+
+    const iso = gridToIso(gx, gy);
+    const container = document.getElementById('canvas-container');
+    camera.x = container.clientWidth / 2 - iso.x * camera.zoom;
+    camera.y = container.clientHeight / 2 - iso.y * camera.zoom;
+});
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        selectTool(null);
+        selectedTool = null;
+        document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('info-text').textContent = '选择建筑类型，然后点击地图放置';
+        canvas.style.cursor = 'default';
+    }
+    if (e.key === '1') selectTool('residential');
+    if (e.key === '2') selectTool('commercial');
+    if (e.key === '3') selectTool('industrial');
+    if (e.key === '4') selectTool('road');
+    if (e.key === '5') selectTool('park');
+    if (e.key === '6') selectTool('powerplant');
+    if (e.key === '7') selectTool('watertower');
+    if (e.key === 'd' || e.key === 'D') selectTool('demolish');
+    if (e.key === '+' || e.key === '=') zoomIn();
+    if (e.key === '-') zoomOut();
+});
+
+window.addEventListener('resize', () => {
+    resizeCanvas();
+});
+
+// ==================== GAME LOOP ====================
+let lastSimTime = 0;
+const SIM_INTERVALS = [0, 1000, 500, 200]; // ms per tick at each speed
+
+function gameLoop(timestamp) {
+    // Simulation
+    if (gameSpeed > 0) {
+        const interval = SIM_INTERVALS[gameSpeed];
+        if (timestamp - lastSimTime >= interval) {
+            simulationTick();
+            lastSimTime = timestamp;
+        }
+    }
+
+    // Render
+    render();
+    renderMinimap();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// ==================== START ====================
+initGrid();
+resizeCanvas();
+centerCamera();
+updateStatsUI();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

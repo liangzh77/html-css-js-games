@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>六边形消除</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0f0f23;
+  overflow: hidden;
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+}
+
+canvas { display: block; touch-action: none; }
+
+#ui-overlay {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex; justify-content: center; align-items: center;
+  pointer-events: none; z-index: 10;
+}
+
+#start-screen, #gameover-screen {
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: auto; text-align: center;
+  background: rgba(15,15,35,0.88);
+  padding: 40px 50px; border-radius: 24px;
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(12px);
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+#start-screen h1, #gameover-screen h1 {
+  color: #fff; font-size: clamp(32px, 7vw, 56px);
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, #e94560, #f1c40f, #2ecc71, #3498db, #9b59b6);
+  background-size: 300% 300%;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradShift 4s ease infinite;
+}
+
+@keyframes gradShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+#start-screen p, #gameover-screen p {
+  color: rgba(255,255,255,0.65);
+  font-size: clamp(13px, 2.8vw, 18px);
+  margin-bottom: 5px; line-height: 1.7;
+}
+
+.btn {
+  background: linear-gradient(135deg, #e94560, #c23152);
+  color: #fff; border: none;
+  padding: 15px 56px;
+  font-size: clamp(17px, 3.5vw, 23px);
+  border-radius: 50px; cursor: pointer;
+  margin-top: 26px; font-family: inherit;
+  font-weight: bold; letter-spacing: 3px;
+  box-shadow: 0 4px 30px rgba(233,69,96,0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn:hover { transform: scale(1.06); box-shadow: 0 6px 40px rgba(233,69,96,0.55); }
+.btn:active { transform: scale(0.97); }
+
+#score-display {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  color: #fff; font-size: clamp(20px, 4.5vw, 32px);
+  font-weight: bold; pointer-events: none; z-index: 5;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5); display: none;
+}
+
+#level-display {
+  position: absolute; top: 54px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,0.45); font-size: clamp(12px, 2.5vw, 16px);
+  pointer-events: none; z-index: 5; display: none;
+}
+
+#combo-display {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  color: #ffdd57; font-size: clamp(24px, 5.5vw, 40px);
+  font-weight: bold; pointer-events: none; z-index: 5;
+  opacity: 0; transition: opacity 0.3s;
+  text-shadow: 0 0 25px rgba(255,221,87,0.6);
+}
+
+#final-score {
+  color: #ffdd57; font-size: clamp(44px, 10vw, 76px);
+  font-weight: bold; margin: 16px 0;
+  text-shadow: 0 0 30px rgba(255,221,87,0.5);
+}
+
+.controls-hint {
+  color: rgba(255,255,255,0.35);
+  font-size: clamp(11px, 2.2vw, 14px);
+  margin-top: 20px;
+}
+
+#mobile-controls {
+  position: absolute; bottom: 30px; left: 0; width: 100%;
+  display: none; justify-content: center; gap: 90px;
+  z-index: 15; pointer-events: none;
+}
+
+.mobile-btn {
+  width: clamp(64px, 16vw, 84px); height: clamp(64px, 16vw, 84px);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 2px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.7);
+  font-size: clamp(26px, 7vw, 38px);
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: auto; cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+  touch-action: manipulation; transition: background 0.12s;
+}
+.mobile-btn:active { background: rgba(255,255,255,0.22); }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<div id="score-display">分数: <span id="score-value">0</span></div>
+<div id="level-display">等级: <span id="level-value">1</span></div>
+<div id="combo-display"></div>
+
+<div id="ui-overlay">
+  <div id="start-screen">
+    <h1>六边形消除</h1>
+    <p>旋转中心六边形，接住下落的彩色方块</p>
+    <p>同一层相邻3个或更多同色方块自动消除</p>
+    <button class="btn" id="start-btn">开始游戏</button>
+    <div class="controls-hint">键盘 ← → 或 A / D 旋转六边形</div>
+  </div>
+
+  <div id="gameover-screen">
+    <h1>游戏结束</h1>
+    <p>最终得分</p>
+    <div id="final-score">0</div>
+    <p id="final-level"></p>
+    <button class="btn" id="restart-btn">再来一局</button>
+  </div>
+</div>
+
+<div id="mobile-controls">
+  <div class="mobile-btn" id="btn-left">&#x25C0;</div>
+  <div class="mobile-btn" id="btn-right">&#x25B6;</div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ================ CONSTANTS ================
+  const NUM_SIDES = 6;
+  const STEP = Math.PI * 2 / NUM_SIDES; // 60 degrees
+  const COLORS = ['#e94560','#2ecc71','#3498db','#f1c40f','#9b59b6','#e67e22'];
+  const MATCH_MIN = 3;
+  const MAX_STACK = 10;
+  const BASE_INTERVAL = 1.6; // seconds between block spawns
+  const MIN_INTERVAL = 0.4;
+
+  // ================ GAME STATE ================
+  let canvas, ctx, W, H, cx, cy;
+  let hexR, blockH, baseSpeed;
+  let state = 'start'; // start | playing | clearing | gameover
+  let score, combo, comboTimer, comboDisplayTimer;
+  let hexAngle, hexAngleTarget, sideOffset;
+  let stacks;     // stacks[0..5] = [colorIdx, ...] bottom-up
+  let falling;    // array of FallingBlock
+  let particles;
+  let lastTs, gameTime, spawnTimer, spawnInterval, level;
+  let rotating;
+  let clearSet;       // Set of "side,layer" strings currently flashing
+  let clearFlashTime; // countdown for flash animation
+  let touchStartX;
+  let screenFlash;    // >0 means white overlay fading out
+
+  // ================ DOM ================
+  const $ = id => document.getElementById(id);
+  const $start    = $('start-screen');
+  const $over     = $('gameover-screen');
+  const $scoreDsp = $('score-display');
+  const $scoreVal = $('score-value');
+  const $levelDsp = $('level-display');
+  const $levelVal = $('level-value');
+  const $comboDsp = $('combo-display');
+  const $finalSc  = $('final-score');
+  const $finalLv  = $('final-level');
+  const $startBtn = $('start-btn');
+  const $restBtn  = $('restart-btn');
+  const $mobCtrl  = $('mobile-controls');
+  const $btnL     = $('btn-left');
+  const $btnR     = $('btn-right');
+
+  // ================ INIT ================
+  function boot() {
+    canvas = $('gameCanvas');
+    ctx = canvas.getContext('2d');
+    onResize();
+    window.addEventListener('resize', onResize);
+
+    $start.style.display = 'flex';
+    $startBtn.onclick = startGame;
+    $restBtn.onclick  = startGame;
+
+    window.addEventListener('keydown', onKey);
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+    canvas.addEventListener('touchend',   onTouchEnd,   { passive: false });
+
+    const rf = d => e => { e.preventDefault(); rotate(d); };
+    $btnL.addEventListener('touchstart', rf(-1), { passive: false });
+    $btnL.addEventListener('mousedown',  rf(-1));
+    $btnR.addEventListener('touchstart', rf(1),  { passive: false });
+    $btnR.addEventListener('mousedown',  rf(1));
+
+    lastTs = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function onResize() {
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W; canvas.height = H;
+    cx = W / 2; cy = H / 2;
+    const s = Math.min(W, H);
+    hexR = s * 0.13;
+    blockH = s * 0.04;
+    baseSpeed = s * 0.2;
+  }
+
+  function startGame() {
+    state = 'playing';
+    score = 0; combo = 0; comboTimer = 0; comboDisplayTimer = 0;
+    hexAngle = 0; hexAngleTarget = 0; sideOffset = 0;
+    falling = []; particles = [];
+    gameTime = 0; level = 1; spawnInterval = BASE_INTERVAL;
+    spawnTimer = 0.8; // first block after brief delay
+    rotating = false;
+    clearSet = null; clearFlashTime = 0;
+    screenFlash = 0; touchStartX = 0;
+
+    stacks = Array.from({ length: NUM_SIDES }, () => []);
+
+    $start.style.display = 'none';
+    $over.style.display = 'none';
+    $scoreDsp.style.display = 'block';
+    $levelDsp.style.display = 'block';
+    $scoreVal.textContent = '0';
+    $levelVal.textContent = '1';
+    $comboDsp.style.opacity = '0';
+
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      $mobCtrl.style.display = 'flex';
+    }
+  }
+
+  function endGame() {
+    state = 'gameover';
+    $scoreDsp.style.display = 'none';
+    $levelDsp.style.display = 'none';
+    $mobCtrl.style.display = 'none';
+    $comboDsp.style.opacity = '0';
+    $finalSc.textContent = score;
+    $finalLv.textContent = '到达等级 ' + level;
+    $over.style.display = 'flex';
+  }
+
+  // ================ INPUT ================
+  function onKey(e) {
+    if (state !== 'playing' && state !== 'clearing') return;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') { e.preventDefault(); rotate(-1); }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') { e.preventDefault(); rotate(1); }
+  }
+  function onTouchStart(e) {
+    if (state !== 'playing' && state !== 'clearing') return;
+    touchStartX = e.touches[0].clientX;
+  }
+  function onTouchEnd(e) {
+    if (state !== 'playing' && state !== 'clearing') return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 30) rotate(dx > 0 ? 1 : -1);
+  }
+  function rotate(dir) {
+    if (rotating) return;
+    rotating = true;
+    sideOffset = ((sideOffset + dir) % NUM_SIDES + NUM_SIDES) % NUM_SIDES;
+    hexAngleTarget += dir * STEP;
+  }
+
+  // ================ GEOMETRY ================
+  function vtx(i, r, rot) {
+    const a = rot + i * STEP;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  }
+
+  function blockQuad(side, layer, rot) {
+    const r1 = hexR + layer * (blockH + 1);
+    const r2 = r1 + blockH;
+    return [vtx(side, r1, rot), vtx(side + 1, r1, rot),
+            vtx(side + 1, r2, rot), vtx(side, r2, rot)];
+  }
+
+  // ================ SPAWNING ================
+  function spawnBlock() {
+    const ws = Math.floor(Math.random() * NUM_SIDES);
+    const ci = Math.floor(Math.random() * COLORS.length);
+    const d  = Math.min(W, H) * 0.50;
+    // Travel angle: midpoint of the "world side" lane
+    const ta = -Math.PI / 2 + (ws + 0.5) * STEP;
+    falling.push({
+      ws: ws, ci: ci, dist: d, ta: ta,
+      spd: baseSpeed * (1 + (level - 1) * 0.13),
+      alive: true
+    });
+  }
+
+  // ================ MATCHING ================
+  // Find all runs of >= MATCH_MIN adjacent same-color blocks at each layer.
+  // Returns a Set of "side,layer" keys, or null if none.
+  function findMatches() {
+    const maxL = Math.max(0, ...stacks.map(s => s.length));
+    const matched = new Set();
+
+    for (let layer = 0; layer < maxL; layer++) {
+      // Build ring at this layer
+      const ring = [];
+      for (let s = 0; s < NUM_SIDES; s++) {
+        ring.push(layer < stacks[s].length ? stacks[s][layer] : -1);
+      }
+
+      // For each position, walk forward while same color.
+      // We must check all starting positions to handle all possible runs.
+      const used = new Set(); // sides already claimed in a run at this layer
+      for (let start = 0; start < NUM_SIDES; start++) {
+        if (ring[start] === -1 || used.has(start)) continue;
+        const c = ring[start];
+        const run = [start];
+        for (let k = 1; k < NUM_SIDES; k++) {
+          const idx = (start + k) % NUM_SIDES;
+          if (ring[idx] === c && !used.has(idx)) run.push(idx);
+          else break;
+        }
+        if (run.length >= MATCH_MIN) {
+          for (const s of run) {
+            matched.add(s + ',' + layer);
+            used.add(s);
+          }
+        }
+      }
+    }
+    return matched.size > 0 ? matched : null;
+  }
+
+  // Actually remove blocks in clearSet, spawn particles, update score.
+  function executeClear() {
+    // Group by side, sort layers descending so splice is safe
+    const bySide = {};
+    for (const key of clearSet) {
+      const [s, l] = key.split(',').map(Number);
+      if (!bySide[s]) bySide[s] = [];
+      bySide[s].push(l);
+    }
+
+    const count = clearSet.size;
+    for (const s in bySide) {
+      bySide[s].sort((a, b) => b - a);
+      for (const l of bySide[s]) {
+        if (l < stacks[s].length) {
+          emitParticles(parseInt(s), l, stacks[s][l]);
+          stacks[s].splice(l, 1);
+        }
+      }
+    }
+
+    // Scoring
+    combo++;
+    comboTimer = 2.5;
+    const pts = count * 10 * combo;
+    score += pts;
+    $scoreVal.textContent = score;
+
+    $comboDsp.textContent = (combo > 1 ? combo + 'x 连击! ' : '') + '+' + pts;
+    $comboDsp.style.opacity = '1';
+    comboDisplayTimer = 1.8;
+    screenFlash = 0.15;
+
+    clearSet = null;
+  }
+
+  // ================ PARTICLES ================
+  function emitParticles(side, layer, ci) {
+    const rot = hexAngle - Math.PI / 2;
+    const q = blockQuad(side, layer, rot);
+    const mx = (q[0].x + q[1].x + q[2].x + q[3].x) / 4;
+    const my = (q[0].y + q[1].y + q[2].y + q[3].y) / 4;
+    const col = COLORS[ci];
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 60 + Math.random() * 200;
+      particles.push({
+        x: mx + (Math.random() - 0.5) * 14,
+        y: my + (Math.random() - 0.5) * 14,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0.5 + Math.random() * 0.5,
+        ml: 0.5 + Math.random() * 0.5,
+        col: col, sz: 2 + Math.random() * 5
+      });
+    }
+  }
+
+  // ================ UPDATE ================
+  function update(dt) {
+    gameTime += dt;
+
+    // Level
+    const nl = 1 + Math.floor(gameTime / 20);
+    if (nl !== level) { level = nl; $levelVal.textContent = level; }
+    spawnInterval = Math.max(MIN_INTERVAL, BASE_INTERVAL - (level - 1) * 0.12);
+
+    // Smooth hex rotation
+    const rd = hexAngleTarget - hexAngle;
+    if (Math.abs(rd) > 0.002) {
+      hexAngle += rd * Math.min(1, dt * 14);
+    } else {
+      hexAngle = hexAngleTarget;
+      rotating = false;
+    }
+
+    // Timers
+    if (comboDisplayTimer > 0) {
+      comboDisplayTimer -= dt;
+      if (comboDisplayTimer <= 0) $comboDsp.style.opacity = '0';
+    }
+    if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 0; }
+    if (screenFlash > 0) screenFlash -= dt;
+
+    // Handle clearing state
+    if (state === 'clearing') {
+      clearFlashTime -= dt;
+      if (clearFlashTime <= 0) {
+        executeClear();
+        // Chain: check for more matches
+        const m = findMatches();
+        if (m) {
+          clearSet = m;
+          clearFlashTime = 0.25;
+          // stay in clearing state
+        } else {
+          state = 'playing';
+        }
+      }
+      // While clearing, still move falling blocks and spawn
+    }
+
+    // Spawn
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnBlock();
+      spawnTimer = spawnInterval;
+      if (level >= 4 && Math.random() < 0.25) spawnBlock();
+    }
+
+    // Update falling blocks
+    for (const b of falling) {
+      if (!b.alive) continue;
+      b.dist -= b.spd * dt;
+
+      const ps = ((b.ws - sideOffset) % NUM_SIDES + NUM_SIDES) % NUM_SIDES;
+      const landDist = hexR + stacks[ps].length * (blockH + 1);
+
+      if (b.dist <= landDist) {
+        b.alive = false;
+        stacks[ps].push(b.ci);
+
+        if (stacks[ps].length >= MAX_STACK) { endGame(); return; }
+
+        // Check matches
+        if (state === 'playing') {
+          const m = findMatches();
+          if (m) {
+            clearSet = m;
+            clearFlashTime = 0.3;
+            state = 'clearing';
+          }
+        }
+      }
+    }
+    falling = falling.filter(b => b.alive);
+
+    // Particles
+    for (const p of particles) {
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.vy += 180 * dt; p.life -= dt;
+    }
+    particles = particles.filter(p => p.life > 0);
+  }
+
+  // ================ RENDER ================
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7);
+    bg.addColorStop(0, '#16213e');
+    bg.addColorStop(1, '#0a0a1a');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    if (state === 'start') return;
+
+    const rot = hexAngle - Math.PI / 2; // flat-top orientation
+
+    drawLanes(rot);
+    drawStacks(rot);
+    drawFalling();
+    drawHex(rot);
+    drawParticles();
+
+    // Screen flash on clear
+    if (screenFlash > 0) {
+      ctx.save();
+      ctx.globalAlpha = screenFlash * 2;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
+  }
+
+  function drawHex(rot) {
+    // Glow
+    ctx.save();
+    ctx.shadowColor = 'rgba(100,140,255,0.3)';
+    ctx.shadowBlur = 30;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const v = vtx(i, hexR, rot);
+      i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y);
+    }
+    ctx.closePath();
+    const hg = ctx.createRadialGradient(cx, cy, 0, cx, cy, hexR);
+    hg.addColorStop(0, '#1e2a50');
+    hg.addColorStop(1, '#111128');
+    ctx.fillStyle = hg;
+    ctx.fill();
+    ctx.restore();
+
+    // Border
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const v = vtx(i, hexR, rot);
+      i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Inner decoration
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const v = vtx(i, hexR * 0.5, rot);
+      i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  function drawLanes(rot) {
+    const far = Math.max(W, H) * 0.6;
+    ctx.save();
+    // Lane divider lines from hex vertices outward
+    for (let i = 0; i < 6; i++) {
+      const v = vtx(i, hexR, rot);
+      const a = rot + i * STEP;
+      ctx.beginPath();
+      ctx.moveTo(v.x, v.y);
+      ctx.lineTo(cx + far * Math.cos(a), cy + far * Math.sin(a));
+      ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // Danger zone ring
+    const dr = hexR + (MAX_STACK - 2) * (blockH + 1);
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const v = vtx(i, dr, rot);
+      i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(233,69,96,0.07)';
+    ctx.setLineDash([4, 8]);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function drawStacks(rot) {
+    for (let s = 0; s < 6; s++) {
+      for (let l = 0; l < stacks[s].length; l++) {
+        const ci = stacks[s][l];
+        const q = blockQuad(s, l, rot);
+        const isFlashing = clearSet && clearSet.has(s + ',' + l);
+
+        // Block shape
+        ctx.beginPath();
+        ctx.moveTo(q[0].x, q[0].y); ctx.lineTo(q[1].x, q[1].y);
+        ctx.lineTo(q[2].x, q[2].y); ctx.lineTo(q[3].x, q[3].y);
+        ctx.closePath();
+
+        if (isFlashing) {
+          // Flash animation: pulsing white overlay
+          const t = Date.now() * 0.015;
+          const flash = 0.5 + 0.5 * Math.sin(t);
+          ctx.fillStyle = COLORS[ci];
+          ctx.fill();
+          ctx.save();
+          ctx.globalAlpha = flash * 0.6;
+          ctx.fillStyle = '#fff';
+          ctx.fill();
+          ctx.restore();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = COLORS[ci];
+          ctx.fill();
+
+          // Outer edge highlight
+          ctx.beginPath();
+          ctx.moveTo(q[3].x, q[3].y); ctx.lineTo(q[2].x, q[2].y);
+          ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Border
+          ctx.beginPath();
+          ctx.moveTo(q[0].x, q[0].y); ctx.lineTo(q[1].x, q[1].y);
+          ctx.lineTo(q[2].x, q[2].y); ctx.lineTo(q[3].x, q[3].y);
+          ctx.closePath();
+          ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+
+        // Danger glow on top block of nearly-full stacks
+        if (!isFlashing && stacks[s].length >= MAX_STACK - 2 && l === stacks[s].length - 1) {
+          const p = 0.25 + 0.15 * Math.sin(Date.now() * 0.007);
+          ctx.save();
+          ctx.globalAlpha = p;
+          ctx.fillStyle = '#ff2244';
+          ctx.beginPath();
+          ctx.moveTo(q[0].x, q[0].y); ctx.lineTo(q[1].x, q[1].y);
+          ctx.lineTo(q[2].x, q[2].y); ctx.lineTo(q[3].x, q[3].y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+  }
+
+  function drawFalling() {
+    for (const b of falling) {
+      if (!b.alive) continue;
+      const a = b.ta; // travel angle (world space, fixed)
+      const bx = cx + Math.cos(a) * b.dist;
+      const by = cy + Math.sin(a) * b.dist;
+      const perp = a + Math.PI / 2;
+      const hw = blockH * 0.8;
+
+      // Diamond shape
+      ctx.beginPath();
+      ctx.moveTo(bx + Math.cos(perp) * hw, by + Math.sin(perp) * hw);
+      ctx.lineTo(bx - Math.cos(a) * blockH * 0.7, by - Math.sin(a) * blockH * 0.7);
+      ctx.lineTo(bx - Math.cos(perp) * hw, by - Math.sin(perp) * hw);
+      ctx.lineTo(bx + Math.cos(a) * blockH * 0.7, by + Math.sin(a) * blockH * 0.7);
+      ctx.closePath();
+      ctx.fillStyle = COLORS[b.ci];
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Trail
+      ctx.save();
+      ctx.globalAlpha = 0.1;
+      const tl = blockH * 2.5;
+      ctx.beginPath();
+      ctx.moveTo(bx + Math.cos(perp) * hw * 0.25, by + Math.sin(perp) * hw * 0.25);
+      ctx.lineTo(bx - Math.cos(perp) * hw * 0.25, by - Math.sin(perp) * hw * 0.25);
+      ctx.lineTo(bx + Math.cos(a) * tl, by + Math.sin(a) * tl);
+      ctx.closePath();
+      ctx.fillStyle = COLORS[b.ci];
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawParticles() {
+    for (const p of particles) {
+      const a = Math.max(0, p.life / p.ml);
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.col;
+      ctx.shadowColor = p.col;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.sz * a, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // ================ LOOP ================
+  function loop(ts) {
+    const dt = Math.min((ts - lastTs) / 1000, 0.05);
+    lastTs = ts;
+    if (state === 'playing' || state === 'clearing') update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

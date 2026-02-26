@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>浏览器冒险 - Browser Quest RPG</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    color: #e0e0e0;
+  }
+  #gameTitle {
+    font-size: 28px;
+    color: #ffd700;
+    text-shadow: 2px 2px 0 #b8860b, 0 0 10px rgba(255,215,0,0.5);
+    margin-bottom: 8px;
+    letter-spacing: 4px;
+    image-rendering: pixelated;
+  }
+  #gameContainer {
+    position: relative;
+    border: 3px solid #4a4a6a;
+    box-shadow: 0 0 20px rgba(100,100,200,0.3), inset 0 0 20px rgba(0,0,0,0.5);
+    background: #000;
+  }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  #hud {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .hud-item {
+    background: rgba(0,0,0,0.75);
+    border: 1px solid #4a4a6a;
+    padding: 4px 10px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #ddd;
+    border-radius: 3px;
+  }
+  #healthBar {
+    width: 160px;
+    height: 14px;
+    background: #333;
+    border: 1px solid #666;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 2px;
+  }
+  #healthFill {
+    height: 100%;
+    background: linear-gradient(180deg, #4caf50, #2e7d32);
+    transition: width 0.3s;
+  }
+  #minimap {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    border: 2px solid #4a4a6a;
+    background: rgba(0,0,0,0.8);
+    z-index: 10;
+    image-rendering: pixelated;
+  }
+  #messageLog {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .msg {
+    background: rgba(0,0,0,0.7);
+    padding: 3px 8px;
+    margin-top: 2px;
+    font-size: 12px;
+    border-radius: 2px;
+    animation: msgFade 4s forwards;
+    border-left: 2px solid #ffd700;
+  }
+  @keyframes msgFade {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  #startScreen, #deathScreen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 16px;
+  }
+  #deathScreen { display: none; }
+  .screenTitle {
+    font-size: 36px;
+    color: #ffd700;
+    text-shadow: 2px 2px 0 #b8860b;
+    letter-spacing: 6px;
+  }
+  .screenSub {
+    font-size: 14px;
+    color: #aaa;
+    margin-bottom: 10px;
+  }
+  .btn {
+    background: linear-gradient(180deg, #5a5a8a, #3a3a5a);
+    border: 2px solid #7a7aaa;
+    color: #ffd700;
+    padding: 10px 32px;
+    font-size: 16px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    letter-spacing: 2px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    background: linear-gradient(180deg, #7a7aaa, #5a5a8a);
+    transform: scale(1.05);
+  }
+  #statsDisplay {
+    font-size: 13px;
+    color: #aaa;
+    text-align: center;
+    line-height: 1.8;
+  }
+  #zoneLabel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 28px;
+    color: #ffd700;
+    text-shadow: 2px 2px 0 #000;
+    pointer-events: none;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.5s;
+    letter-spacing: 4px;
+  }
+  #controls {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #666;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameTitle">⚔ 浏览器冒险 ⚔</div>
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="hud">
+    <div class="hud-item" id="hudHP">
+      ❤ 生命值
+      <div id="healthBar"><div id="healthFill" style="width:100%"></div></div>
+    </div>
+    <div class="hud-item" id="hudAtk">⚔ 攻击力: 10</div>
+    <div class="hud-item" id="hudScore">★ 分数: 0</div>
+    <div class="hud-item" id="hudZone">📍 宁静小镇</div>
+  </div>
+
+  <canvas id="minimap" width="140" height="140"></canvas>
+
+  <div id="messageLog"></div>
+
+  <div id="zoneLabel"></div>
+
+  <div id="startScreen">
+    <div class="screenTitle">浏览器冒险</div>
+    <div class="screenSub">一款像素风RPG冒险游戏</div>
+    <div style="font-size:13px;color:#888;text-align:center;line-height:1.8;">
+      方向键 / WASD 移动<br>
+      走向敌人进行攻击<br>
+      收集宝箱恢复生命与提升攻击<br>
+      探索森林、地牢与小镇
+    </div>
+    <button class="btn" id="startBtn">开始冒险</button>
+  </div>
+
+  <div id="deathScreen">
+    <div class="screenTitle" style="color:#ff4444;">你已阵亡</div>
+    <div id="statsDisplay"></div>
+    <button class="btn" id="respawnBtn">重新开始</button>
+  </div>
+</div>
+<div id="controls">方向键/WASD移动 | 走向敌人攻击 | 收集宝箱获得道具</div>
+
+<script>
+// ============================================================
+// BROWSER QUEST RPG - Complete Single-File Game
+// ============================================================
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const minimapCanvas = document.getElementById('minimap');
+const minimapCtx = minimapCanvas.getContext('2d');
+
+// Game dimensions
+const CANVAS_W = 800;
+const CANVAS_H = 560;
+canvas.width = CANVAS_W;
+canvas.height = CANVAS_H;
+
+const TILE = 32;
+const MAP_W = 120;  // tiles
+const MAP_H = 120;
+
+// Tile types
+const T = {
+  VOID: 0, GRASS: 1, DIRT: 2, STONE: 3, WALL: 4, WATER: 5,
+  TREE: 6, DUNGEON_FLOOR: 7, DUNGEON_WALL: 8, BRIDGE: 9,
+  HOUSE_WALL: 10, HOUSE_FLOOR: 11, PATH: 12, FLOWER: 13,
+  DARK_GRASS: 14, BUSH: 15, LAVA: 16, TOMBSTONE: 17
+};
+
+// Zone definitions
+const ZONE = {
+  TOWN: 'town',
+  FOREST: 'forest',
+  DUNGEON: 'dungeon',
+  GRAVEYARD: 'graveyard'
+};
+
+const ZONE_NAMES = {
+  town: '宁静小镇',
+  forest: '幽暗森林',
+  dungeon: '黑暗地牢',
+  graveyard: '亡灵墓地'
+};
+
+// ============================================================
+// AUDIO ENGINE
+// ============================================================
+class AudioEngine {
+  constructor() {
+    try {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) {
+      this.ctx = null;
+    }
+  }
+  play(type) {
+    if (!this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      switch(type) {
+        case 'hit':
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(200, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + 0.15);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.start(now); osc.stop(now + 0.15);
+          break;
+        case 'hurt':
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          osc.start(now); osc.stop(now + 0.2);
+          break;
+        case 'pickup':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(400, now);
+          osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          osc.start(now); osc.stop(now + 0.2);
+          break;
+        case 'death':
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(400, now);
+          osc.frequency.exponentialRampToValueAtTime(50, now + 0.6);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc.start(now); osc.stop(now + 0.6);
+          break;
+        case 'chest':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523, now);
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc.start(now); osc.stop(now + 0.4);
+          const osc2 = this.ctx.createOscillator();
+          const gain2 = this.ctx.createGain();
+          osc2.connect(gain2); gain2.connect(this.ctx.destination);
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(659, now + 0.1);
+          gain2.gain.setValueAtTime(0.1, now + 0.1);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+          osc2.start(now + 0.1); osc2.stop(now + 0.5);
+          const osc3 = this.ctx.createOscillator();
+          const gain3 = this.ctx.createGain();
+          osc3.connect(gain3); gain3.connect(this.ctx.destination);
+          osc3.type = 'sine';
+          osc3.frequency.setValueAtTime(784, now + 0.2);
+          gain3.gain.setValueAtTime(0.1, now + 0.2);
+          gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc3.start(now + 0.2); osc3.stop(now + 0.6);
+          break;
+        case 'levelup':
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.setValueAtTime(554, now + 0.12);
+          osc.frequency.setValueAtTime(659, now + 0.24);
+          osc.frequency.setValueAtTime(880, now + 0.36);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+          osc.start(now); osc.stop(now + 0.5);
+          break;
+        case 'step':
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(80 + Math.random() * 40, now);
+          gain.gain.setValueAtTime(0.03, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.start(now); osc.stop(now + 0.05);
+          break;
+      }
+    } catch(e) {}
+  }
+}
+
+const audio = new AudioEngine();
+
+// ============================================================
+// SEEDED RNG for consistent map generation
+// ============================================================
+class SeededRNG {
+  constructor(seed) { this.seed = seed; }
+  next() {
+    this.seed = (this.seed * 16807 + 0) % 2147483647;
+    return (this.seed - 1) / 2147483646;
+  }
+}
+
+// ============================================================
+// MAP GENERATION
+// ============================================================
+let worldMap = new Uint8Array(MAP_W * MAP_H);
+let zoneMap = new Array(MAP_W * MAP_H).fill(ZONE.FOREST);
+let explored = new Uint8Array(MAP_W * MAP_H);
+
+function tileAt(x, y) {
+  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return T.WALL;
+  return worldMap[y * MAP_W + x];
+}
+function setTile(x, y, t) {
+  if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) worldMap[y * MAP_W + x] = t;
+}
+function setZone(x, y, z) {
+  if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) zoneMap[y * MAP_W + x] = z;
+}
+function getZone(x, y) {
+  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return ZONE.FOREST;
+  return zoneMap[y * MAP_W + x];
+}
+
+function isWalkable(tileType) {
+  return tileType !== T.VOID && tileType !== T.WALL && tileType !== T.WATER &&
+         tileType !== T.TREE && tileType !== T.DUNGEON_WALL &&
+         tileType !== T.HOUSE_WALL && tileType !== T.BUSH && tileType !== T.LAVA;
+}
+
+function generateWorld() {
+  const rng = new SeededRNG(42);
+  // Fill with grass
+  for (let i = 0; i < MAP_W * MAP_H; i++) {
+    worldMap[i] = T.GRASS;
+    zoneMap[i] = ZONE.FOREST;
+  }
+
+  // ---- TOWN (center-ish area) ----
+  const townCX = 30, townCY = 30;
+  const townR = 18;
+  for (let y = townCY - townR; y <= townCY + townR; y++) {
+    for (let x = townCX - townR; x <= townCX + townR; x++) {
+      if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) {
+        setTile(x, y, T.GRASS);
+        setZone(x, y, ZONE.TOWN);
+        // Paths
+        if (Math.abs(x - townCX) <= 1 || Math.abs(y - townCY) <= 1) {
+          setTile(x, y, T.PATH);
+        }
+      }
+    }
+  }
+
+  // Town houses
+  const houses = [
+    { x: townCX - 10, y: townCY - 10, w: 6, h: 5 },
+    { x: townCX + 5, y: townCY - 10, w: 7, h: 5 },
+    { x: townCX - 12, y: townCY + 3, w: 5, h: 5 },
+    { x: townCX + 6, y: townCY + 4, w: 6, h: 5 },
+    { x: townCX - 8, y: townCY + 8, w: 5, h: 4 },
+    { x: townCX + 3, y: townCY - 6, w: 4, h: 4 },
+  ];
+  houses.forEach(h => {
+    for (let y = h.y; y < h.y + h.h; y++) {
+      for (let x = h.x; x < h.x + h.w; x++) {
+        if (y === h.y || y === h.y + h.h - 1 || x === h.x || x === h.x + h.w - 1) {
+          setTile(x, y, T.HOUSE_WALL);
+        } else {
+          setTile(x, y, T.HOUSE_FLOOR);
+        }
+      }
+    }
+    // Door
+    setTile(h.x + Math.floor(h.w / 2), h.y + h.h - 1, T.HOUSE_FLOOR);
+  });
+
+  // Town flowers
+  for (let i = 0; i < 30; i++) {
+    const fx = townCX - townR + Math.floor(rng.next() * townR * 2);
+    const fy = townCY - townR + Math.floor(rng.next() * townR * 2);
+    if (tileAt(fx, fy) === T.GRASS) setTile(fx, fy, T.FLOWER);
+  }
+
+  // ---- FOREST (surrounds everything) ----
+  // Add trees everywhere in forest zone
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (getZone(x, y) === ZONE.FOREST && tileAt(x, y) === T.GRASS) {
+        if (rng.next() < 0.18) setTile(x, y, T.TREE);
+        else if (rng.next() < 0.06) setTile(x, y, T.BUSH);
+        else if (rng.next() < 0.04) setTile(x, y, T.DARK_GRASS);
+        else if (rng.next() < 0.02) setTile(x, y, T.FLOWER);
+      }
+    }
+  }
+
+  // Forest clearings with paths from town
+  // Path going east
+  for (let x = townCX + townR; x < 80; x++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      setTile(x, townCY + dy, T.DIRT);
+      if (tileAt(x, townCY + dy + 2) === T.TREE && rng.next() < 0.3) {
+        setTile(x, townCY + dy + 2, T.GRASS);
+      }
+    }
+  }
+  // Path going south
+  for (let y = townCY + townR; y < 85; y++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      setTile(townCX + dx, y, T.DIRT);
+    }
+  }
+  // Path going north
+  for (let y = 5; y < townCY - townR; y++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      setTile(townCX + dx, y, T.DIRT);
+    }
+  }
+
+  // Rivers / water
+  for (let y = 0; y < MAP_H; y++) {
+    const wx = 65 + Math.floor(Math.sin(y * 0.15) * 4);
+    for (let dx = -2; dx <= 2; dx++) {
+      if (wx + dx >= 0 && wx + dx < MAP_W) {
+        setTile(wx + dx, y, T.WATER);
+      }
+    }
+  }
+  // Bridge over river on east path
+  for (let dx = -3; dx <= 3; dx++) {
+    setTile(65 + dx, townCY - 1, T.BRIDGE);
+    setTile(65 + dx, townCY, T.BRIDGE);
+    setTile(65 + dx, townCY + 1, T.BRIDGE);
+  }
+
+  // ---- DUNGEON (east side) ----
+  const dungCX = 90, dungCY = 30;
+  const dungW = 24, dungH = 24;
+  for (let y = dungCY - dungH/2; y < dungCY + dungH/2; y++) {
+    for (let x = dungCX - dungW/2; x < dungCX + dungW/2; x++) {
+      if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) {
+        setTile(x, y, T.DUNGEON_WALL);
+        setZone(x, y, ZONE.DUNGEON);
+      }
+    }
+  }
+  // Carve dungeon rooms
+  const dungRooms = [];
+  for (let i = 0; i < 6; i++) {
+    const rw = 4 + Math.floor(rng.next() * 5);
+    const rh = 4 + Math.floor(rng.next() * 5);
+    const rx = dungCX - dungW/2 + 2 + Math.floor(rng.next() * (dungW - rw - 4));
+    const ry = dungCY - dungH/2 + 2 + Math.floor(rng.next() * (dungH - rh - 4));
+    dungRooms.push({x: rx, y: ry, w: rw, h: rh});
+    for (let y = ry; y < ry + rh; y++) {
+      for (let x = rx; x < rx + rw; x++) {
+        setTile(x, y, T.DUNGEON_FLOOR);
+      }
+    }
+  }
+  // Connect dungeon rooms with corridors
+  for (let i = 0; i < dungRooms.length - 1; i++) {
+    const a = dungRooms[i], b = dungRooms[i+1];
+    const ax = Math.floor(a.x + a.w/2), ay = Math.floor(a.y + a.h/2);
+    const bx = Math.floor(b.x + b.w/2), by = Math.floor(b.y + b.h/2);
+    let cx = ax, cy = ay;
+    while (cx !== bx) {
+      setTile(cx, cy, T.DUNGEON_FLOOR);
+      cx += cx < bx ? 1 : -1;
+    }
+    while (cy !== by) {
+      setTile(cx, cy, T.DUNGEON_FLOOR);
+      cy += cy < by ? 1 : -1;
+    }
+  }
+  // Dungeon entrance
+  for (let x = dungCX - dungW/2 - 3; x <= dungCX - dungW/2; x++) {
+    setTile(x, dungCY, T.DUNGEON_FLOOR);
+    setTile(x, dungCY - 1, T.DUNGEON_FLOOR);
+  }
+
+  // Path from bridge to dungeon entrance
+  for (let x = 70; x < dungCX - dungW/2 - 3; x++) {
+    setTile(x, townCY, T.DIRT);
+    setTile(x, townCY - 1, T.DIRT);
+    // Clear trees near path
+    for (let dy = -2; dy <= 2; dy++) {
+      if (tileAt(x, townCY + dy) === T.TREE) setTile(x, townCY + dy, T.GRASS);
+    }
+  }
+
+  // Lava in deepest dungeon room
+  const lastRoom = dungRooms[dungRooms.length - 1];
+  for (let y = lastRoom.y + 1; y < lastRoom.y + lastRoom.h - 1; y++) {
+    for (let x = lastRoom.x + 1; x < lastRoom.x + lastRoom.w - 1; x++) {
+      if (rng.next() < 0.3) setTile(x, y, T.LAVA);
+    }
+  }
+
+  // ---- GRAVEYARD (south) ----
+  const graveCX = 30, graveCY = 75;
+  const graveR = 14;
+  for (let y = graveCY - graveR; y <= graveCY + graveR; y++) {
+    for (let x = graveCX - graveR; x <= graveCX + graveR; x++) {
+      if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) {
+        setTile(x, y, T.DARK_GRASS);
+        setZone(x, y, ZONE.GRAVEYARD);
+        if (tileAt(x, y) === T.DARK_GRASS && rng.next() < 0.06) {
+          setTile(x, y, T.TOMBSTONE);
+        }
+      }
+    }
+  }
+  // Clear path into graveyard
+  for (let y = townCY + townR; y <= graveCY - graveR; y++) {
+    setTile(townCX, y, T.DIRT);
+    setTile(townCX - 1, y, T.DIRT);
+    setTile(townCX + 1, y, T.DIRT);
+  }
+
+  // Ensure starting area is clear
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const t = tileAt(townCX + dx, townCY + dy);
+      if (!isWalkable(t)) setTile(townCX + dx, townCY + dy, T.PATH);
+    }
+  }
+}
+
+// ============================================================
+// PIXEL ART SPRITE RENDERER
+// ============================================================
+const spriteCache = {};
+
+function createPixelSprite(pixels, scale) {
+  const key = JSON.stringify(pixels) + scale;
+  if (spriteCache[key]) return spriteCache[key];
+  const rows = pixels.length;
+  const cols = pixels[0].length;
+  const c = document.createElement('canvas');
+  c.width = cols * scale;
+  c.height = rows * scale;
+  const cx = c.getContext('2d');
+  for (let r = 0; r < rows; r++) {
+    for (let cl = 0; cl < cols; cl++) {
+      const color = pixels[r][cl];
+      if (color) {
+        cx.fillStyle = color;
+        cx.fillRect(cl * scale, r * scale, scale, scale);
+      }
+    }
+  }
+  spriteCache[key] = c;
+  return c;
+}
+
+// Player sprite frames
+const _ = null;
+const playerFrames = [
+  // Frame 0 - standing
+  [
+    [_,_,'#f5d0a0','#f5d0a0','#f5d0a0',_,_,_],
+    [_,'#f5d0a0','#f5d0a0','#f5d0a0','#f5d0a0','#f5d0a0',_,_],
+    [_,'#3a3a3a','#fff','#f5d0a0','#fff','#3a3a3a',_,_],
+    [_,_,'#f5d0a0','#d4956a','#f5d0a0',_,_,_],
+    [_,_,_,'#c0392b',_,_,_,_],
+    [_,'#4a69bd','#4a69bd','#4a69bd','#4a69bd','#4a69bd',_,_],
+    [_,'#4a69bd','#4a69bd','#4a69bd','#4a69bd','#4a69bd',_,_],
+    ['#c0392b','#4a69bd','#4a69bd','#4a69bd','#4a69bd','#4a69bd','#aaa',_],
+    [_,_,'#4a69bd',_,'#4a69bd',_,_,_],
+    [_,_,'#8B4513',_,'#8B4513',_,_,_],
+  ],
+  // Frame 1 - walking
+  [
+    [_,_,'#f5d0a0','#f5d0a0','#f5d0a0',_,_,_],
+    [_,'#f5d0a0','#f5d0a0','#f5d0a0','#f5d0a0','#f5d0a0',_,_],
+    [_,'#3a3a3a','#fff','#f5d0a0','#fff','#3a3a3a',_,_],
+    [_,_,'#f5d0a0','#d4956a','#f5d0a0',_,_,_],
+    [_,_,_,'#c0392b',_,_,_,_],
+    [_,'#4a69bd','#4a69bd','#4a69bd','#4a69bd','#4a69bd',_,_],
+    [_,'#4a69bd','#4a69bd','#4a69bd','#4a69bd','#4a69bd',_,_],
+    ['#c0392b','#4a69bd','#4a69bd','#4a69bd','#4a69bd','#4a69bd','#aaa',_],
+    [_,'#8B4513',_,_,_,'#8B4513',_,_],
+    [_,_,_,_,_,_,_,_],
+  ]
+];
+
+// Sword sprite
+const swordSprite = [
+  [_,_,_,_,'#ccc'],
+  [_,_,_,'#ccc','#fff'],
+  [_,_,'#ccc',_,_],
+  [_,'#8B4513',_,_,_],
+  ['#8B4513',_,_,_,_],
+];
+
+// Slime enemy
+const slimeFrames = [
+  [
+    [_,_,_,_,_,_,_,_],
+    [_,_,'#4CAF50','#4CAF50','#4CAF50',_,_,_],
+    [_,'#4CAF50','#4CAF50','#4CAF50','#4CAF50','#4CAF50',_,_],
+    [_,'#4CAF50','#fff','#4CAF50','#fff','#4CAF50',_,_],
+    [_,'#4CAF50','#000','#4CAF50','#000','#4CAF50',_,_],
+    [_,'#388E3C','#388E3C','#388E3C','#388E3C','#388E3C',_,_],
+    [_,_,'#2E7D32','#2E7D32','#2E7D32',_,_,_],
+    [_,_,_,_,_,_,_,_],
+  ],
+  [
+    [_,_,_,_,_,_,_,_],
+    [_,_,_,_,_,_,_,_],
+    [_,'#4CAF50','#4CAF50','#4CAF50','#4CAF50','#4CAF50',_,_],
+    [_,'#4CAF50','#fff','#4CAF50','#fff','#4CAF50',_,_],
+    [_,'#4CAF50','#000','#4CAF50','#000','#4CAF50',_,_],
+    ['#388E3C','#388E3C','#388E3C','#388E3C','#388E3C','#388E3C','#388E3C',_],
+    [_,'#2E7D32','#2E7D32','#2E7D32','#2E7D32','#2E7D32',_,_],
+    [_,_,_,_,_,_,_,_],
+  ]
+];
+
+// Skeleton enemy
+const skeletonFrames = [
+  [
+    [_,_,'#ddd','#ddd','#ddd',_,_,_],
+    [_,'#ddd','#ddd','#ddd','#ddd','#ddd',_,_],
+    [_,'#333','#ddd','#ddd','#ddd','#333',_,_],
+    [_,_,'#ddd','#555','#ddd',_,_,_],
+    [_,_,_,'#bbb',_,_,_,_],
+    [_,_,'#bbb','#bbb','#bbb',_,_,_],
+    [_,'#bbb',_,'#bbb',_,'#bbb',_,_],
+    [_,_,_,'#bbb',_,_,_,_],
+    [_,_,'#bbb',_,'#bbb',_,_,_],
+    [_,'#bbb',_,_,_,'#bbb',_,_],
+  ],
+  [
+    [_,_,'#ddd','#ddd','#ddd',_,_,_],
+    [_,'#ddd','#ddd','#ddd','#ddd','#ddd',_,_],
+    [_,'#333','#ddd','#ddd','#ddd','#333',_,_],
+    [_,_,'#ddd','#555','#ddd',_,_,_],
+    [_,_,_,'#bbb',_,_,_,_],
+    [_,_,'#bbb','#bbb','#bbb',_,_,_],
+    ['#bbb','#bbb',_,'#bbb',_,'#bbb','#bbb',_],
+    [_,_,_,'#bbb',_,_,_,_],
+    [_,'#bbb',_,_,_,'#bbb',_,_],
+    [_,_,'#bbb',_,'#bbb',_,_,_],
+  ]
+];
+
+// Bat enemy
+const batFrames = [
+  [
+    [_,_,_,_,_,_,_,_,_,_],
+    ['#5D4E7A',_,_,_,_,_,_,_,_,'#5D4E7A'],
+    ['#5D4E7A','#5D4E7A',_,_,_,_,_,_,'#5D4E7A','#5D4E7A'],
+    ['#5D4E7A','#5D4E7A','#7B68AE','#7B68AE','#7B68AE','#7B68AE','#7B68AE','#7B68AE','#5D4E7A','#5D4E7A'],
+    [_,_,'#7B68AE','#ff0','#7B68AE','#7B68AE','#ff0','#7B68AE',_,_],
+    [_,_,_,'#7B68AE','#7B68AE','#7B68AE','#7B68AE',_,_,_],
+    [_,_,_,_,'#5D4E7A','#5D4E7A',_,_,_,_],
+    [_,_,_,_,_,_,_,_,_,_],
+  ],
+  [
+    [_,_,_,_,_,_,_,_,_,_],
+    [_,_,_,_,_,_,_,_,_,_],
+    ['#5D4E7A','#5D4E7A',_,_,_,_,_,_,'#5D4E7A','#5D4E7A'],
+    [_,'#5D4E7A','#7B68AE','#7B68AE','#7B68AE','#7B68AE','#7B68AE','#7B68AE','#5D4E7A',_],
+    [_,_,'#7B68AE','#ff0','#7B68AE','#7B68AE','#ff0','#7B68AE',_,_],
+    [_,_,_,'#7B68AE','#7B68AE','#7B68AE','#7B68AE',_,_,_],
+    ['#5D4E7A',_,_,_,'#5D4E7A','#5D4E7A',_,_,_,'#5D4E7A'],
+    [_,_,_,_,_,_,_,_,_,_],
+  ]
+];
+
+// Boss enemy
+const bossFrames = [
+  [
+    [_,_,_,'#8B0000','#8B0000','#8B0000',_,_,_,_],
+    [_,_,'#8B0000','#B22222','#B22222','#B22222','#8B0000',_,_,_],
+    [_,'#8B0000','#B22222','#B22222','#B22222','#B22222','#B22222','#8B0000',_,_],
+    [_,'#B22222','#ff0','#B22222','#B22222','#B22222','#ff0','#B22222',_,_],
+    [_,'#B22222','#B22222','#B22222','#fff','#B22222','#B22222','#B22222',_,_],
+    [_,'#8B0000','#B22222','#B22222','#B22222','#B22222','#B22222','#8B0000',_,_],
+    ['#8B0000','#8B0000','#B22222','#B22222','#B22222','#B22222','#8B0000','#8B0000',_,_],
+    [_,'#8B0000',_,'#8B0000','#8B0000',_,'#8B0000',_,_,_],
+    [_,_,_,'#555','#555',_,_,_,_,_],
+    [_,_,'#555',_,_,'#555',_,_,_,_],
+  ],
+  [
+    [_,_,_,'#8B0000','#8B0000','#8B0000',_,_,_,_],
+    [_,_,'#8B0000','#B22222','#B22222','#B22222','#8B0000',_,_,_],
+    [_,'#8B0000','#B22222','#B22222','#B22222','#B22222','#B22222','#8B0000',_,_],
+    [_,'#B22222','#ff0','#B22222','#B22222','#B22222','#ff0','#B22222',_,_],
+    [_,'#B22222','#B22222','#fff','#B22222','#fff','#B22222','#B22222',_,_],
+    [_,'#8B0000','#B22222','#B22222','#B22222','#B22222','#B22222','#8B0000',_,_],
+    ['#8B0000','#8B0000','#B22222','#B22222','#B22222','#B22222','#8B0000','#8B0000',_,_],
+    [_,_,'#8B0000','#8B0000','#8B0000','#8B0000',_,_,_,_],
+    [_,_,'#555',_,_,'#555',_,_,_,_],
+    [_,'#555',_,_,_,_,'#555',_,_,_],
+  ]
+];
+
+// Chest sprite
+const chestClosed = [
+  [_,_,_,_,_,_,_,_],
+  [_,'#8B4513','#A0522D','#A0522D','#A0522D','#A0522D','#8B4513',_],
+  [_,'#A0522D','#D2691E','#D2691E','#D2691E','#D2691E','#A0522D',_],
+  [_,'#A0522D','#D2691E','#ffd700','#ffd700','#D2691E','#A0522D',_],
+  [_,'#8B4513','#A0522D','#A0522D','#A0522D','#A0522D','#8B4513',_],
+  [_,'#8B4513','#A0522D','#A0522D','#A0522D','#A0522D','#8B4513',_],
+  [_,'#6B3410','#8B4513','#8B4513','#8B4513','#8B4513','#6B3410',_],
+  [_,_,_,_,_,_,_,_],
+];
+
+const chestOpen = [
+  ['#8B4513','#A0522D','#A0522D','#A0522D','#A0522D','#A0522D','#8B4513',_],
+  [_,_,_,_,_,_,_,_],
+  [_,'#8B4513','#A0522D','#A0522D','#A0522D','#A0522D','#8B4513',_],
+  [_,'#A0522D','#ffd700','#ffd700','#ffd700','#ffd700','#A0522D',_],
+  [_,'#8B4513','#A0522D','#A0522D','#A0522D','#A0522D','#8B4513',_],
+  [_,'#8B4513','#A0522D','#A0522D','#A0522D','#A0522D','#8B4513',_],
+  [_,'#6B3410','#8B4513','#8B4513','#8B4513','#8B4513','#6B3410',_],
+  [_,_,_,_,_,_,_,_],
+];
+
+// Heart pickup sprite
+const heartSprite = [
+  [_,_,_,_,_,_,_,_],
+  [_,'#e74c3c','#e74c3c',_,'#e74c3c','#e74c3c',_,_],
+  ['#e74c3c','#ff6b6b','#e74c3c','#e74c3c','#e74c3c','#ff6b6b','#e74c3c',_],
+  ['#e74c3c','#e74c3c','#e74c3c','#e74c3c','#e74c3c','#e74c3c','#e74c3c',_],
+  [_,'#c0392b','#c0392b','#c0392b','#c0392b','#c0392b',_,_],
+  [_,_,'#a93226','#a93226','#a93226',_,_,_],
+  [_,_,_,'#922b21',_,_,_,_],
+  [_,_,_,_,_,_,_,_],
+];
+
+// ============================================================
+// GAME STATE
+// ============================================================
+let gameState = 'start'; // start, playing, dead
+let player = {};
+let enemies = [];
+let items = [];
+let particles = [];
+let damageNumbers = [];
+let messages = [];
+let camera = { x: 0, y: 0 };
+let keys = {};
+let lastZone = '';
+let zoneLabelTimer = 0;
+let gameTime = 0;
+let stepTimer = 0;
+
+function initPlayer() {
+  player = {
+    x: 30, y: 30, // tile coords
+    px: 30 * TILE, py: 30 * TILE, // pixel coords (smooth)
+    hp: 100, maxHp: 100,
+    atk: 10, baseAtk: 10,
+    score: 0,
+    frame: 0, frameTimer: 0,
+    attackCooldown: 0,
+    hurtTimer: 0,
+    facing: 0, // 0=down, 1=left, 2=up, 3=right
+    moveTimer: 0,
+    kills: 0,
+    chestsOpened: 0,
+    moving: false,
+    atkBoostTimer: 0,
+  };
+}
+
+function spawnEnemies() {
+  enemies = [];
+  const rng = new SeededRNG(123);
+
+  // Town area - no enemies, it's safe
+
+  // Forest enemies - slimes and bats
+  for (let i = 0; i < 40; i++) {
+    let ex, ey, attempts = 0;
+    do {
+      ex = Math.floor(rng.next() * MAP_W);
+      ey = Math.floor(rng.next() * MAP_H);
+      attempts++;
+    } while (attempts < 100 && (
+      !isWalkable(tileAt(ex, ey)) ||
+      getZone(ex, ey) === ZONE.TOWN ||
+      getZone(ex, ey) === ZONE.DUNGEON ||
+      (Math.abs(ex - 30) < 5 && Math.abs(ey - 30) < 5)
+    ));
+    if (attempts >= 100) continue;
+
+    const type = rng.next() < 0.6 ? 'slime' : 'bat';
+    enemies.push(createEnemy(ex, ey, type, getZone(ex, ey)));
+  }
+
+  // Dungeon enemies - skeletons and bats
+  for (let i = 0; i < 20; i++) {
+    let ex, ey, attempts = 0;
+    do {
+      ex = 78 + Math.floor(rng.next() * 24);
+      ey = 18 + Math.floor(rng.next() * 24);
+      attempts++;
+    } while (attempts < 100 && (
+      !isWalkable(tileAt(ex, ey)) ||
+      getZone(ex, ey) !== ZONE.DUNGEON
+    ));
+    if (attempts >= 100) continue;
+
+    const type = rng.next() < 0.5 ? 'skeleton' : 'bat';
+    enemies.push(createEnemy(ex, ey, type, ZONE.DUNGEON));
+  }
+
+  // Graveyard enemies - skeletons
+  for (let i = 0; i < 15; i++) {
+    let ex, ey, attempts = 0;
+    do {
+      ex = 16 + Math.floor(rng.next() * 28);
+      ey = 61 + Math.floor(rng.next() * 28);
+      attempts++;
+    } while (attempts < 100 && (
+      !isWalkable(tileAt(ex, ey)) ||
+      getZone(ex, ey) !== ZONE.GRAVEYARD
+    ));
+    if (attempts >= 100) continue;
+    enemies.push(createEnemy(ex, ey, 'skeleton', ZONE.GRAVEYARD));
+  }
+
+  // Boss in dungeon
+  const bossX = 90, bossY = 30;
+  if (isWalkable(tileAt(bossX, bossY))) {
+    enemies.push(createEnemy(bossX, bossY, 'boss', ZONE.DUNGEON));
+  }
+}
+
+function createEnemy(x, y, type, zone) {
+  const stats = {
+    slime:    { hp: 30, atk: 5, speed: 0.8, xp: 10, chase: 4 },
+    bat:      { hp: 20, atk: 8, speed: 1.5, xp: 15, chase: 6 },
+    skeleton: { hp: 50, atk: 12, speed: 0.6, xp: 25, chase: 5 },
+    boss:     { hp: 200, atk: 20, speed: 0.4, xp: 100, chase: 8 },
+  };
+  const s = stats[type];
+  return {
+    x, y, px: x * TILE, py: y * TILE,
+    hp: s.hp, maxHp: s.hp, atk: s.atk, speed: s.speed,
+    xp: s.xp, chaseRange: s.chase,
+    type, zone,
+    frame: 0, frameTimer: 0,
+    hurtTimer: 0, attackCooldown: 0,
+    patrolDir: Math.floor(Math.random() * 4),
+    patrolTimer: 0, alive: true,
+    originX: x, originY: y,
+    moveTimer: 0,
+  };
+}
+
+function spawnItems() {
+  items = [];
+  const rng = new SeededRNG(456);
+
+  // Chests scattered around
+  const chestLocations = [];
+
+  // Forest chests
+  for (let i = 0; i < 12; i++) {
+    let cx, cy, attempts = 0;
+    do {
+      cx = Math.floor(rng.next() * MAP_W);
+      cy = Math.floor(rng.next() * MAP_H);
+      attempts++;
+    } while (attempts < 100 && (!isWalkable(tileAt(cx, cy)) || getZone(cx, cy) === ZONE.TOWN));
+    if (attempts < 100) chestLocations.push({x: cx, y: cy});
+  }
+
+  // Dungeon chests
+  for (let i = 0; i < 6; i++) {
+    let cx, cy, attempts = 0;
+    do {
+      cx = 78 + Math.floor(rng.next() * 24);
+      cy = 18 + Math.floor(rng.next() * 24);
+      attempts++;
+    } while (attempts < 100 && (!isWalkable(tileAt(cx, cy)) || getZone(cx, cy) !== ZONE.DUNGEON));
+    if (attempts < 100) chestLocations.push({x: cx, y: cy});
+  }
+
+  // Graveyard chests
+  for (let i = 0; i < 4; i++) {
+    let cx, cy, attempts = 0;
+    do {
+      cx = 16 + Math.floor(rng.next() * 28);
+      cy = 61 + Math.floor(rng.next() * 28);
+      attempts++;
+    } while (attempts < 100 && (!isWalkable(tileAt(cx, cy)) || getZone(cx, cy) !== ZONE.GRAVEYARD));
+    if (attempts < 100) chestLocations.push({x: cx, y: cy});
+  }
+
+  chestLocations.forEach((loc, i) => {
+    const isAtk = rng.next() < 0.3;
+    items.push({
+      x: loc.x, y: loc.y,
+      type: isAtk ? 'atkBoost' : 'heal',
+      value: isAtk ? (3 + Math.floor(rng.next() * 5)) : (20 + Math.floor(rng.next() * 30)),
+      collected: false,
+    });
+  });
+
+  // Heart pickups near difficult areas
+  for (let i = 0; i < 8; i++) {
+    let hx, hy, attempts = 0;
+    do {
+      hx = Math.floor(rng.next() * MAP_W);
+      hy = Math.floor(rng.next() * MAP_H);
+      attempts++;
+    } while (attempts < 100 && !isWalkable(tileAt(hx, hy)));
+    if (attempts < 100) {
+      items.push({
+        x: hx, y: hy,
+        type: 'heart',
+        value: 25,
+        collected: false,
+      });
+    }
+  }
+}
+
+// ============================================================
+// TILE RENDERING
+// ============================================================
+const tileColors = {};
+
+function getTileCanvas(type) {
+  if (tileColors[type]) return tileColors[type];
+  const c = document.createElement('canvas');
+  c.width = TILE; c.height = TILE;
+  const cx = c.getContext('2d');
+
+  switch(type) {
+    case T.GRASS:
+      cx.fillStyle = '#4a8c3f';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#5a9c4f';
+      for (let i = 0; i < 6; i++) {
+        cx.fillRect(Math.random()*28, Math.random()*28, 2, 4);
+      }
+      break;
+    case T.DARK_GRASS:
+      cx.fillStyle = '#2d5a27';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#3a6a34';
+      for (let i = 0; i < 4; i++) {
+        cx.fillRect(Math.random()*28, Math.random()*28, 2, 3);
+      }
+      break;
+    case T.DIRT:
+      cx.fillStyle = '#8B7355';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#9B8365';
+      for (let i = 0; i < 5; i++) {
+        cx.fillRect(Math.random()*28, Math.random()*28, 3, 2);
+      }
+      break;
+    case T.PATH:
+      cx.fillStyle = '#C4A87C';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#B49A6E';
+      cx.fillRect(2, 2, 4, 2);
+      cx.fillRect(18, 14, 3, 2);
+      cx.fillRect(10, 24, 4, 2);
+      break;
+    case T.STONE:
+      cx.fillStyle = '#808080';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#909090';
+      cx.fillRect(0, 0, 16, 16);
+      cx.fillRect(16, 16, 16, 16);
+      cx.fillStyle = '#707070';
+      cx.fillRect(0, 15, 32, 2);
+      cx.fillRect(15, 0, 2, 32);
+      break;
+    case T.WALL:
+      cx.fillStyle = '#555';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#444';
+      cx.fillRect(1, 1, TILE-2, TILE-2);
+      break;
+    case T.WATER:
+      cx.fillStyle = '#2980b9';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#3498db';
+      cx.fillRect(4, 8, 12, 2);
+      cx.fillRect(16, 20, 10, 2);
+      break;
+    case T.TREE:
+      // Ground underneath
+      cx.fillStyle = '#4a8c3f';
+      cx.fillRect(0, 0, TILE, TILE);
+      // Trunk
+      cx.fillStyle = '#6B3410';
+      cx.fillRect(12, 20, 8, 12);
+      // Leaves
+      cx.fillStyle = '#2d6b1e';
+      cx.fillRect(4, 4, 24, 18);
+      cx.fillStyle = '#3a8a2a';
+      cx.fillRect(6, 2, 20, 14);
+      cx.fillStyle = '#4CAF50';
+      cx.fillRect(10, 6, 6, 4);
+      break;
+    case T.BUSH:
+      cx.fillStyle = '#4a8c3f';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#2E7D32';
+      cx.fillRect(4, 10, 24, 16);
+      cx.fillStyle = '#388E3C';
+      cx.fillRect(6, 8, 20, 12);
+      break;
+    case T.DUNGEON_FLOOR:
+      cx.fillStyle = '#3a3a4a';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#444458';
+      cx.fillRect(2, 2, 12, 12);
+      cx.fillRect(18, 18, 12, 12);
+      cx.fillStyle = '#333345';
+      cx.fillRect(0, 15, TILE, 1);
+      cx.fillRect(15, 0, 1, TILE);
+      break;
+    case T.DUNGEON_WALL:
+      cx.fillStyle = '#2a2a3a';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#3a3a4a';
+      cx.fillRect(2, 2, TILE-4, TILE-4);
+      cx.fillStyle = '#222235';
+      cx.fillRect(0, 0, TILE, 3);
+      cx.fillRect(0, TILE-3, TILE, 3);
+      cx.fillRect(0, 0, 3, TILE);
+      cx.fillRect(TILE-3, 0, 3, TILE);
+      break;
+    case T.BRIDGE:
+      cx.fillStyle = '#8B6914';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#A0792C';
+      cx.fillRect(2, 0, 6, TILE);
+      cx.fillRect(14, 0, 6, TILE);
+      cx.fillRect(26, 0, 4, TILE);
+      cx.fillStyle = '#6B4E0A';
+      cx.fillRect(0, 0, TILE, 2);
+      cx.fillRect(0, TILE-2, TILE, 2);
+      break;
+    case T.HOUSE_WALL:
+      cx.fillStyle = '#8B7355';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#A08868';
+      cx.fillRect(2, 2, TILE-4, TILE-4);
+      cx.fillStyle = '#7B6345';
+      cx.fillRect(0, 15, TILE, 2);
+      break;
+    case T.HOUSE_FLOOR:
+      cx.fillStyle = '#C4A87C';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#D4B88C';
+      cx.fillRect(0, 0, 16, 16);
+      cx.fillRect(16, 16, 16, 16);
+      break;
+    case T.FLOWER:
+      cx.fillStyle = '#4a8c3f';
+      cx.fillRect(0, 0, TILE, TILE);
+      const flowerColors = ['#e74c3c','#f1c40f','#9b59b6','#3498db'];
+      for (let i = 0; i < 3; i++) {
+        cx.fillStyle = flowerColors[i % flowerColors.length];
+        cx.fillRect(6 + i*8, 10 + (i%2)*6, 4, 4);
+        cx.fillStyle = '#2d6b1e';
+        cx.fillRect(7 + i*8, 14 + (i%2)*6, 2, 6);
+      }
+      break;
+    case T.LAVA:
+      cx.fillStyle = '#c0392b';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#e74c3c';
+      cx.fillRect(4, 4, 10, 8);
+      cx.fillRect(18, 16, 8, 6);
+      cx.fillStyle = '#f39c12';
+      cx.fillRect(6, 6, 4, 4);
+      cx.fillRect(20, 18, 4, 3);
+      break;
+    case T.TOMBSTONE:
+      cx.fillStyle = '#2d5a27';
+      cx.fillRect(0, 0, TILE, TILE);
+      cx.fillStyle = '#777';
+      cx.fillRect(10, 6, 12, 20);
+      cx.fillStyle = '#888';
+      cx.fillRect(8, 4, 16, 4);
+      cx.fillRect(12, 4, 8, 18);
+      cx.fillStyle = '#666';
+      cx.fillRect(13, 10, 6, 2);
+      cx.fillRect(15, 8, 2, 6);
+      break;
+    default:
+      cx.fillStyle = '#333';
+      cx.fillRect(0, 0, TILE, TILE);
+  }
+  tileColors[type] = c;
+  return c;
+}
+
+// ============================================================
+// PARTICLES AND EFFECTS
+// ============================================================
+function addParticle(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 3,
+      vy: (Math.random() - 0.5) * 3 - 1,
+      life: 20 + Math.random() * 20,
+      maxLife: 40,
+      color,
+      size: 2 + Math.random() * 3,
+    });
+  }
+}
+
+function addDamageNumber(x, y, value, color) {
+  damageNumbers.push({
+    x, y,
+    value: String(value),
+    color,
+    life: 40,
+    vy: -1.5,
+  });
+}
+
+function addMessage(text, color) {
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.style.color = color || '#fff';
+  div.textContent = text;
+  const log = document.getElementById('messageLog');
+  log.appendChild(div);
+  setTimeout(() => { if (div.parentNode) div.parentNode.removeChild(div); }, 4000);
+  // Keep only last 4
+  while (log.children.length > 4) log.removeChild(log.firstChild);
+}
+
+// ============================================================
+// GAME LOGIC
+// ============================================================
+function startGame() {
+  generateWorld();
+  initPlayer();
+  spawnEnemies();
+  spawnItems();
+  explored = new Uint8Array(MAP_W * MAP_H);
+  particles = [];
+  damageNumbers = [];
+  gameTime = 0;
+  lastZone = '';
+  gameState = 'playing';
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('deathScreen').style.display = 'none';
+  if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();
+}
+
+function playerDeath() {
+  gameState = 'dead';
+  audio.play('death');
+  addParticle(player.px + 16, player.py + 16, '#e74c3c', 20);
+  document.getElementById('deathScreen').style.display = 'flex';
+  document.getElementById('statsDisplay').innerHTML =
+    `分数: ${player.score}<br>击杀: ${player.kills}<br>宝箱: ${player.chestsOpened}<br>存活时间: ${Math.floor(gameTime/60)}秒`;
+}
+
+function moveEntity(entity, dx, dy) {
+  const newX = entity.x + dx;
+  const newY = entity.y + dy;
+  if (newX >= 0 && newY >= 0 && newX < MAP_W && newY < MAP_H && isWalkable(tileAt(newX, newY))) {
+    entity.x = newX;
+    entity.y = newY;
+    return true;
+  }
+  return false;
+}
+
+function updatePlayer(dt) {
+  if (gameState !== 'playing') return;
+
+  player.frameTimer += dt;
+  if (player.frameTimer > 12) {
+    player.frame = 1 - player.frame;
+    player.frameTimer = 0;
+  }
+
+  if (player.hurtTimer > 0) player.hurtTimer -= dt;
+  if (player.attackCooldown > 0) player.attackCooldown -= dt;
+  if (player.atkBoostTimer > 0) {
+    player.atkBoostTimer -= dt;
+    if (player.atkBoostTimer <= 0) {
+      player.atk = player.baseAtk;
+      addMessage('攻击加成已消失', '#aaa');
+    }
+  }
+
+  player.moveTimer -= dt;
+  if (player.moveTimer > 0) {
+    player.moving = false;
+    // Smooth movement
+    player.px += (player.x * TILE - player.px) * 0.3;
+    player.py += (player.y * TILE - player.py) * 0.3;
+    return;
+  }
+
+  let dx = 0, dy = 0;
+  if (keys['ArrowUp'] || keys['w'] || keys['W']) { dy = -1; player.facing = 2; }
+  else if (keys['ArrowDown'] || keys['s'] || keys['S']) { dy = 1; player.facing = 0; }
+  else if (keys['ArrowLeft'] || keys['a'] || keys['A']) { dx = -1; player.facing = 1; }
+  else if (keys['ArrowRight'] || keys['d'] || keys['D']) { dx = 1; player.facing = 3; }
+
+  player.moving = dx !== 0 || dy !== 0;
+
+  if (dx !== 0 || dy !== 0) {
+    // Check for enemy collision first (attack)
+    const targetX = player.x + dx;
+    const targetY = player.y + dy;
+    let attackedEnemy = null;
+
+    for (const e of enemies) {
+      if (e.alive && e.x === targetX && e.y === targetY) {
+        attackedEnemy = e;
+        break;
+      }
+    }
+
+    if (attackedEnemy && player.attackCooldown <= 0) {
+      // Attack enemy
+      const dmg = player.atk + Math.floor(Math.random() * 4);
+      attackedEnemy.hp -= dmg;
+      attackedEnemy.hurtTimer = 8;
+      player.attackCooldown = 12;
+      audio.play('hit');
+      addParticle(attackedEnemy.px + 16, attackedEnemy.py + 16, '#ff0', 5);
+      addDamageNumber(attackedEnemy.px + 16, attackedEnemy.py, dmg, '#ff0');
+
+      if (attackedEnemy.hp <= 0) {
+        attackedEnemy.alive = false;
+        player.score += attackedEnemy.xp;
+        player.kills++;
+        addParticle(attackedEnemy.px + 16, attackedEnemy.py + 16, '#e74c3c', 10);
+        const name = {slime:'史莱姆', bat:'蝙蝠', skeleton:'骷髅', boss:'魔王'}[attackedEnemy.type];
+        addMessage(`击败了${name}! +${attackedEnemy.xp}分`, '#ffd700');
+        audio.play('levelup');
+
+        // Chance to drop heart
+        if (Math.random() < 0.3) {
+          items.push({
+            x: attackedEnemy.x, y: attackedEnemy.y,
+            type: 'heart', value: 15, collected: false
+          });
+        }
+      }
+      player.moveTimer = 6;
+    } else if (!attackedEnemy) {
+      if (moveEntity(player, dx, dy)) {
+        player.moveTimer = 5;
+        stepTimer++;
+        if (stepTimer % 4 === 0) audio.play('step');
+      }
+    }
+  }
+
+  // Smooth movement
+  player.px += (player.x * TILE - player.px) * 0.3;
+  player.py += (player.y * TILE - player.py) * 0.3;
+
+  // Check item collection
+  for (const item of items) {
+    if (!item.collected && item.x === player.x && item.y === player.y) {
+      item.collected = true;
+      if (item.type === 'heal') {
+        player.hp = Math.min(player.maxHp, player.hp + item.value);
+        addMessage(`打开宝箱: 恢复 ${item.value} 生命值!`, '#4CAF50');
+        audio.play('chest');
+        player.chestsOpened++;
+        player.score += 5;
+      } else if (item.type === 'atkBoost') {
+        player.atk = player.baseAtk + item.value;
+        player.atkBoostTimer = 600; // 10 seconds
+        addMessage(`打开宝箱: 攻击力 +${item.value} (限时)!`, '#ff9800');
+        audio.play('chest');
+        player.chestsOpened++;
+        player.score += 10;
+      } else if (item.type === 'heart') {
+        player.hp = Math.min(player.maxHp, player.hp + item.value);
+        addMessage(`获得爱心: 恢复 ${item.value} 生命值`, '#e74c3c');
+        audio.play('pickup');
+        player.score += 3;
+      }
+      addParticle(item.x * TILE + 16, item.y * TILE + 16, '#ffd700', 8);
+    }
+  }
+
+  // Update explored map
+  const viewR = 6;
+  for (let dy2 = -viewR; dy2 <= viewR; dy2++) {
+    for (let dx2 = -viewR; dx2 <= viewR; dx2++) {
+      const ex = player.x + dx2, ey = player.y + dy2;
+      if (ex >= 0 && ey >= 0 && ex < MAP_W && ey < MAP_H) {
+        explored[ey * MAP_W + ex] = 1;
+      }
+    }
+  }
+
+  // Zone change detection
+  const curZone = getZone(player.x, player.y);
+  if (curZone !== lastZone) {
+    lastZone = curZone;
+    const label = document.getElementById('zoneLabel');
+    label.textContent = ZONE_NAMES[curZone] || curZone;
+    label.style.opacity = 1;
+    zoneLabelTimer = 120;
+  }
+}
+
+function updateEnemies(dt) {
+  if (gameState !== 'playing') return;
+
+  for (const e of enemies) {
+    if (!e.alive) continue;
+
+    e.frameTimer += dt;
+    if (e.frameTimer > 15) {
+      e.frame = 1 - e.frame;
+      e.frameTimer = 0;
+    }
+    if (e.hurtTimer > 0) e.hurtTimer -= dt;
+    if (e.attackCooldown > 0) e.attackCooldown -= dt;
+
+    e.moveTimer -= dt;
+    if (e.moveTimer > 0) {
+      e.px += (e.x * TILE - e.px) * 0.25;
+      e.py += (e.y * TILE - e.py) * 0.25;
+      continue;
+    }
+
+    const dist = Math.abs(e.x - player.x) + Math.abs(e.y - player.y);
+
+    // Adjacent to player? Attack!
+    if (dist === 1 && e.attackCooldown <= 0) {
+      const dmg = e.atk + Math.floor(Math.random() * 3);
+      player.hp -= dmg;
+      player.hurtTimer = 8;
+      e.attackCooldown = 20;
+      audio.play('hurt');
+      addParticle(player.px + 16, player.py + 16, '#e74c3c', 4);
+      addDamageNumber(player.px + 16, player.py, dmg, '#e74c3c');
+
+      if (player.hp <= 0) {
+        player.hp = 0;
+        playerDeath();
+        return;
+      }
+    }
+
+    // Movement AI
+    const moveInterval = Math.floor(10 / e.speed);
+    let dx = 0, dy = 0;
+
+    if (dist <= e.chaseRange && dist > 1) {
+      // Chase player
+      if (Math.abs(player.x - e.x) > Math.abs(player.y - e.y)) {
+        dx = player.x > e.x ? 1 : -1;
+      } else {
+        dy = player.y > e.y ? 1 : -1;
+      }
+    } else if (dist > e.chaseRange) {
+      // Patrol randomly
+      e.patrolTimer++;
+      if (e.patrolTimer > 30) {
+        e.patrolDir = Math.floor(Math.random() * 4);
+        e.patrolTimer = 0;
+      }
+      const dirs = [[0,-1],[0,1],[-1,0],[1,0]];
+      dx = dirs[e.patrolDir][0];
+      dy = dirs[e.patrolDir][1];
+      // Don't wander too far from origin
+      if (Math.abs(e.x + dx - e.originX) > 8 || Math.abs(e.y + dy - e.originY) > 8) {
+        dx = e.originX > e.x ? 1 : e.originX < e.x ? -1 : 0;
+        dy = e.originY > e.y ? 1 : e.originY < e.y ? -1 : 0;
+      }
+    }
+
+    if (dx !== 0 || dy !== 0) {
+      const newX = e.x + dx;
+      const newY = e.y + dy;
+      // Don't walk onto player or other enemies
+      let blocked = false;
+      if (newX === player.x && newY === player.y) blocked = true;
+      for (const other of enemies) {
+        if (other !== e && other.alive && other.x === newX && other.y === newY) { blocked = true; break; }
+      }
+      if (!blocked) {
+        moveEntity(e, dx, dy);
+      }
+    }
+    e.moveTimer = moveInterval;
+
+    e.px += (e.x * TILE - e.px) * 0.25;
+    e.py += (e.y * TILE - e.py) * 0.25;
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.05;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = damageNumbers.length - 1; i >= 0; i--) {
+    const d = damageNumbers[i];
+    d.y += d.vy;
+    d.life -= dt;
+    if (d.life <= 0) damageNumbers.splice(i, 1);
+  }
+}
+
+function updateCamera() {
+  const targetX = player.px - CANVAS_W / 2 + 16;
+  const targetY = player.py - CANVAS_H / 2 + 16;
+  camera.x += (targetX - camera.x) * 0.15;
+  camera.y += (targetY - camera.y) * 0.15;
+  camera.x = Math.max(0, Math.min(MAP_W * TILE - CANVAS_W, camera.x));
+  camera.y = Math.max(0, Math.min(MAP_H * TILE - CANVAS_H, camera.y));
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function drawWorld() {
+  const startTX = Math.floor(camera.x / TILE);
+  const startTY = Math.floor(camera.y / TILE);
+  const endTX = Math.min(MAP_W - 1, startTX + Math.ceil(CANVAS_W / TILE) + 1);
+  const endTY = Math.min(MAP_H - 1, startTY + Math.ceil(CANVAS_H / TILE) + 1);
+
+  for (let ty = startTY; ty <= endTY; ty++) {
+    for (let tx = startTX; tx <= endTX; tx++) {
+      const tile = tileAt(tx, ty);
+      const screenX = tx * TILE - camera.x;
+      const screenY = ty * TILE - camera.y;
+      const tileCanvas = getTileCanvas(tile);
+      ctx.drawImage(tileCanvas, Math.floor(screenX), Math.floor(screenY));
+    }
+  }
+
+  // Water shimmer effect
+  if (gameTime % 30 < 15) {
+    for (let ty = startTY; ty <= endTY; ty++) {
+      for (let tx = startTX; tx <= endTX; tx++) {
+        if (tileAt(tx, ty) === T.WATER) {
+          const screenX = tx * TILE - camera.x;
+          const screenY = ty * TILE - camera.y;
+          ctx.fillStyle = 'rgba(255,255,255,0.1)';
+          ctx.fillRect(Math.floor(screenX) + 8, Math.floor(screenY) + 4, 8, 2);
+        }
+      }
+    }
+  }
+  // Lava glow effect
+  for (let ty = startTY; ty <= endTY; ty++) {
+    for (let tx = startTX; tx <= endTX; tx++) {
+      if (tileAt(tx, ty) === T.LAVA) {
+        const screenX = tx * TILE - camera.x;
+        const screenY = ty * TILE - camera.y;
+        const pulse = Math.sin(gameTime * 0.1 + tx + ty) * 0.15 + 0.1;
+        ctx.fillStyle = `rgba(255,${100 + Math.sin(gameTime*0.15)*50},0,${pulse})`;
+        ctx.fillRect(Math.floor(screenX), Math.floor(screenY), TILE, TILE);
+      }
+    }
+  }
+}
+
+function drawItems() {
+  for (const item of items) {
+    if (item.collected) continue;
+    const sx = item.x * TILE - camera.x;
+    const sy = item.y * TILE - camera.y;
+    if (sx < -TILE || sy < -TILE || sx > CANVAS_W || sy > CANVAS_H) continue;
+
+    const bobY = Math.sin(gameTime * 0.1 + item.x) * 2;
+
+    if (item.type === 'heal' || item.type === 'atkBoost') {
+      const sprite = createPixelSprite(chestClosed, 4);
+      ctx.drawImage(sprite, Math.floor(sx), Math.floor(sy + bobY));
+      // Glow
+      ctx.fillStyle = item.type === 'heal' ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)';
+      ctx.fillRect(Math.floor(sx) - 2, Math.floor(sy + bobY) - 2, 36, 36);
+    } else if (item.type === 'heart') {
+      const sprite = createPixelSprite(heartSprite, 4);
+      ctx.drawImage(sprite, Math.floor(sx), Math.floor(sy + bobY));
+    }
+  }
+}
+
+function drawEnemies() {
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const sx = e.px - camera.x;
+    const sy = e.py - camera.y;
+    if (sx < -TILE*2 || sy < -TILE*2 || sx > CANVAS_W + TILE || sy > CANVAS_H + TILE) continue;
+
+    let frames, scale;
+    switch(e.type) {
+      case 'slime': frames = slimeFrames; scale = 4; break;
+      case 'skeleton': frames = skeletonFrames; scale = 3; break;
+      case 'bat': frames = batFrames; scale = 3; break;
+      case 'boss': frames = bossFrames; scale = 3; break;
+      default: frames = slimeFrames; scale = 4;
+    }
+
+    const sprite = createPixelSprite(frames[e.frame], scale);
+
+    // Hurt flash
+    if (e.hurtTimer > 0 && Math.floor(e.hurtTimer) % 4 < 2) {
+      ctx.globalAlpha = 0.5;
+    }
+
+    // Center sprite on tile
+    const offX = (TILE - sprite.width) / 2;
+    const offY = (TILE - sprite.height);
+    ctx.drawImage(sprite, Math.floor(sx + offX), Math.floor(sy + offY));
+    ctx.globalAlpha = 1;
+
+    // Health bar above enemy
+    if (e.hp < e.maxHp) {
+      const barW = 28;
+      const barH = 3;
+      const bx = Math.floor(sx + (TILE - barW) / 2);
+      const by = Math.floor(sy + offY - 6);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(bx, by, barW, barH);
+      ctx.fillStyle = e.hp > e.maxHp * 0.3 ? '#e74c3c' : '#ff0';
+      ctx.fillRect(bx, by, Math.floor(barW * e.hp / e.maxHp), barH);
+    }
+
+    // Boss label
+    if (e.type === 'boss') {
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('魔王', Math.floor(sx + 16), Math.floor(sy + offY - 10));
+      ctx.textAlign = 'left';
+    }
+  }
+}
+
+function drawPlayer() {
+  const sx = player.px - camera.x;
+  const sy = player.py - camera.y;
+
+  const frame = player.moving ? player.frame : 0;
+  const sprite = createPixelSprite(playerFrames[frame], 3);
+
+  // Hurt flash
+  if (player.hurtTimer > 0 && Math.floor(player.hurtTimer) % 4 < 2) {
+    ctx.globalAlpha = 0.5;
+  }
+
+  // Flip based on facing
+  ctx.save();
+  const drawX = Math.floor(sx + (TILE - sprite.width) / 2);
+  const drawY = Math.floor(sy + (TILE - sprite.height));
+
+  if (player.facing === 1) {
+    ctx.translate(drawX + sprite.width, drawY);
+    ctx.scale(-1, 1);
+    ctx.drawImage(sprite, 0, 0);
+  } else {
+    ctx.drawImage(sprite, drawX, drawY);
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  // Draw sword when attacking
+  if (player.attackCooldown > 6) {
+    const swordSpr = createPixelSprite(swordSprite, 3);
+    ctx.save();
+    const sOff = [[8, 20], [-12, 10], [8, -6], [24, 10]]; // down, left, up, right
+    const sRot = [0, -Math.PI/2, Math.PI, Math.PI/2];
+    const so = sOff[player.facing];
+    ctx.translate(Math.floor(sx + so[0] + 8), Math.floor(sy + so[1] + 8));
+    ctx.rotate(sRot[player.facing]);
+    ctx.drawImage(swordSpr, -8, -8);
+    ctx.restore();
+  }
+
+  // Attack boost indicator
+  if (player.atkBoostTimer > 0) {
+    ctx.strokeStyle = '#ff9800';
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.4 + Math.sin(gameTime * 0.2) * 0.2;
+    ctx.strokeRect(Math.floor(sx) - 1, Math.floor(sy) - 1, TILE + 2, TILE + 2);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(
+      Math.floor(p.x - camera.x),
+      Math.floor(p.y - camera.y),
+      p.size, p.size
+    );
+  }
+  ctx.globalAlpha = 1;
+
+  // Damage numbers
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  for (const d of damageNumbers) {
+    ctx.globalAlpha = d.life / 40;
+    ctx.fillStyle = '#000';
+    ctx.fillText(d.value, Math.floor(d.x - camera.x) + 1, Math.floor(d.y - camera.y) + 1);
+    ctx.fillStyle = d.color;
+    ctx.fillText(d.value, Math.floor(d.x - camera.x), Math.floor(d.y - camera.y));
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+function drawMinimap() {
+  const mmW = 140, mmH = 140;
+  const scale = mmW / MAP_W;
+
+  minimapCtx.fillStyle = '#111';
+  minimapCtx.fillRect(0, 0, mmW, mmH);
+
+  // Draw explored tiles
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (!explored[y * MAP_W + x]) continue;
+      const tile = tileAt(x, y);
+      let color;
+      switch(tile) {
+        case T.GRASS: case T.FLOWER: case T.DARK_GRASS: color = '#3a6a2f'; break;
+        case T.WATER: color = '#2980b9'; break;
+        case T.TREE: case T.BUSH: color = '#1a4a10'; break;
+        case T.WALL: case T.HOUSE_WALL: case T.DUNGEON_WALL: color = '#555'; break;
+        case T.PATH: case T.DIRT: case T.BRIDGE: color = '#8B7355'; break;
+        case T.DUNGEON_FLOOR: color = '#3a3a4a'; break;
+        case T.HOUSE_FLOOR: color = '#9a8060'; break;
+        case T.LAVA: color = '#c0392b'; break;
+        case T.TOMBSTONE: color = '#666'; break;
+        default: color = '#2a2a2a';
+      }
+      minimapCtx.fillStyle = color;
+      minimapCtx.fillRect(Math.floor(x * scale), Math.floor(y * scale),
+                          Math.ceil(scale) + 1, Math.ceil(scale) + 1);
+    }
+  }
+
+  // Draw enemies on minimap
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    if (!explored[e.y * MAP_W + e.x]) continue;
+    const dist = Math.abs(e.x - player.x) + Math.abs(e.y - player.y);
+    if (dist > 15) continue;
+    minimapCtx.fillStyle = e.type === 'boss' ? '#ff0' : '#e74c3c';
+    minimapCtx.fillRect(Math.floor(e.x * scale) - 1, Math.floor(e.y * scale) - 1, 3, 3);
+  }
+
+  // Draw items on minimap
+  for (const item of items) {
+    if (item.collected) continue;
+    if (!explored[item.y * MAP_W + item.x]) continue;
+    minimapCtx.fillStyle = '#ffd700';
+    minimapCtx.fillRect(Math.floor(item.x * scale), Math.floor(item.y * scale), 2, 2);
+  }
+
+  // Player position
+  minimapCtx.fillStyle = '#00ff00';
+  minimapCtx.fillRect(Math.floor(player.x * scale) - 1, Math.floor(player.y * scale) - 1, 4, 4);
+
+  // Camera view rectangle
+  minimapCtx.strokeStyle = 'rgba(255,255,255,0.4)';
+  minimapCtx.lineWidth = 1;
+  const cvx = camera.x / TILE * scale;
+  const cvy = camera.y / TILE * scale;
+  const cvw = (CANVAS_W / TILE) * scale;
+  const cvh = (CANVAS_H / TILE) * scale;
+  minimapCtx.strokeRect(cvx, cvy, cvw, cvh);
+}
+
+function drawHUD() {
+  const hpPct = Math.max(0, player.hp / player.maxHp * 100);
+  document.getElementById('healthFill').style.width = hpPct + '%';
+  if (hpPct < 30) {
+    document.getElementById('healthFill').style.background = 'linear-gradient(180deg, #e74c3c, #c0392b)';
+  } else if (hpPct < 60) {
+    document.getElementById('healthFill').style.background = 'linear-gradient(180deg, #f39c12, #d68910)';
+  } else {
+    document.getElementById('healthFill').style.background = 'linear-gradient(180deg, #4caf50, #2e7d32)';
+  }
+  document.getElementById('hudHP').innerHTML = `❤ 生命值: ${player.hp}/${player.maxHp}<div id="healthBar"><div id="healthFill" style="width:${hpPct}%;background:${hpPct<30?'linear-gradient(180deg,#e74c3c,#c0392b)':hpPct<60?'linear-gradient(180deg,#f39c12,#d68910)':'linear-gradient(180deg,#4caf50,#2e7d32)'}"></div></div>`;
+  document.getElementById('hudAtk').textContent = `⚔ 攻击力: ${player.atk}${player.atkBoostTimer > 0 ? ' ⬆' : ''}`;
+  document.getElementById('hudScore').textContent = `★ 分数: ${player.score}`;
+  const zone = getZone(player.x, player.y);
+  document.getElementById('hudZone').textContent = `📍 ${ZONE_NAMES[zone] || '未知区域'}`;
+
+  // Zone label fade
+  if (zoneLabelTimer > 0) {
+    zoneLabelTimer--;
+    if (zoneLabelTimer <= 30) {
+      document.getElementById('zoneLabel').style.opacity = zoneLabelTimer / 30;
+    }
+  }
+
+  // Low HP warning
+  if (player.hp < player.maxHp * 0.25 && gameTime % 30 < 15) {
+    ctx.fillStyle = 'rgba(255,0,0,0.08)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  }
+}
+
+// Dungeon darkness overlay
+function drawDarknessOverlay() {
+  const zone = getZone(player.x, player.y);
+  if (zone === ZONE.DUNGEON) {
+    const gradient = ctx.createRadialGradient(
+      player.px - camera.x + 16, player.py - camera.y + 16, 60,
+      player.px - camera.x + 16, player.py - camera.y + 16, 200
+    );
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  } else if (zone === ZONE.GRAVEYARD) {
+    ctx.fillStyle = 'rgba(10,0,20,0.2)';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    // Fog effect
+    for (let i = 0; i < 3; i++) {
+      const fx = (gameTime * 0.3 + i * 200) % (CANVAS_W + 200) - 100;
+      const fy = 100 + i * 150 + Math.sin(gameTime * 0.02 + i) * 30;
+      ctx.fillStyle = 'rgba(100,80,120,0.04)';
+      ctx.beginPath();
+      ctx.ellipse(fx, fy, 120, 40, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+// ============================================================
+// MAIN GAME LOOP
+// ============================================================
+function gameLoop() {
+  if (gameState === 'playing') {
+    gameTime++;
+    updatePlayer(1);
+    updateEnemies(1);
+    updateParticles(1);
+    updateCamera();
+
+    // Respawn enemies periodically
+    if (gameTime % 600 === 0) {
+      for (const e of enemies) {
+        if (!e.alive) {
+          // Don't respawn boss
+          if (e.type === 'boss') continue;
+          const dist = Math.abs(e.originX - player.x) + Math.abs(e.originY - player.y);
+          if (dist > 15) {
+            e.alive = true;
+            e.hp = e.maxHp;
+            e.x = e.originX;
+            e.y = e.originY;
+            e.px = e.x * TILE;
+            e.py = e.y * TILE;
+          }
+        }
+      }
+    }
+  }
+
+  // Render
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  if (gameState === 'playing' || gameState === 'dead') {
+    drawWorld();
+    drawItems();
+    drawEnemies();
+    if (gameState === 'playing') drawPlayer();
+    drawParticles();
+    drawDarknessOverlay();
+    drawHUD();
+    drawMinimap();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ============================================================
+// INPUT
+// ============================================================
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
+    e.preventDefault();
+  }
+});
+document.addEventListener('keyup', e => {
+  keys[e.key] = false;
+});
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('respawnBtn').addEventListener('click', startGame);
+
+// Start the loop
+gameLoop();
+</script>
+</body>
+</html>

@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>缠绕 - Coil Game</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a12;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  color: #fff;
+}
+canvas {
+  display: block;
+  cursor: none;
+}
+#ui-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+#start-screen, #gameover-screen, #level-screen {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: rgba(5, 5, 15, 0.92);
+  pointer-events: auto;
+  z-index: 10;
+}
+#level-screen { z-index: 11; }
+.hidden { display: none !important; }
+h1 {
+  font-size: 72px;
+  background: linear-gradient(135deg, #00ffcc, #7b2fff, #ff2d95);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+  text-shadow: none;
+  letter-spacing: 12px;
+}
+h2 {
+  font-size: 36px;
+  color: #00ffcc;
+  margin-bottom: 16px;
+  text-shadow: 0 0 20px rgba(0,255,204,0.5);
+}
+.subtitle {
+  font-size: 18px;
+  color: #8888aa;
+  margin-bottom: 40px;
+  letter-spacing: 4px;
+}
+.instructions {
+  max-width: 500px;
+  text-align: center;
+  line-height: 2;
+  color: #aab;
+  font-size: 15px;
+  margin-bottom: 40px;
+}
+.instructions span {
+  color: #00ffcc;
+  font-weight: bold;
+}
+.btn {
+  padding: 14px 48px;
+  font-size: 20px;
+  border: 2px solid #00ffcc;
+  background: transparent;
+  color: #00ffcc;
+  cursor: pointer;
+  border-radius: 4px;
+  letter-spacing: 4px;
+  transition: all 0.3s;
+  pointer-events: auto;
+  font-family: inherit;
+  margin: 8px;
+}
+.btn:hover {
+  background: rgba(0,255,204,0.15);
+  box-shadow: 0 0 30px rgba(0,255,204,0.3);
+}
+#hud {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  z-index: 5;
+  font-size: 16px;
+}
+#hud > div {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.hud-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hud-label { color: #667; font-size: 13px; }
+.hud-value { color: #00ffcc; font-size: 18px; font-weight: bold; text-shadow: 0 0 10px rgba(0,255,204,0.5); }
+.hud-lives { color: #ff2d95; font-size: 20px; letter-spacing: 4px; }
+.powerup-indicator {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 3px;
+  font-size: 12px;
+  margin-left: 8px;
+  animation: pulse-indicator 1s infinite;
+}
+@keyframes pulse-indicator {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.score-popup {
+  position: absolute;
+  color: #00ffcc;
+  font-size: 24px;
+  font-weight: bold;
+  pointer-events: none;
+  text-shadow: 0 0 10px rgba(0,255,204,0.8);
+  animation: float-up 1s ease-out forwards;
+  z-index: 20;
+}
+@keyframes float-up {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
+}
+.gameover-score {
+  font-size: 48px;
+  color: #ff2d95;
+  margin: 16px 0;
+  text-shadow: 0 0 30px rgba(255,45,149,0.6);
+}
+.gameover-high {
+  font-size: 20px;
+  color: #7b2fff;
+  margin-bottom: 30px;
+}
+.level-text {
+  font-size: 64px;
+  color: #7b2fff;
+  text-shadow: 0 0 40px rgba(123,47,255,0.6);
+  margin-bottom: 12px;
+}
+.level-sub {
+  font-size: 18px;
+  color: #8888aa;
+}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<div id="start-screen">
+  <h1>缠绕</h1>
+  <div class="subtitle">C O I L</div>
+  <div class="instructions">
+    移动鼠标控制光线轨迹<br>
+    用轨迹<span>包围敌人</span>即可消灭它们<br>
+    一次包围多个敌人可获得<span>额外奖励</span><br>
+    小心<span style="color:#ff2d55">红色敌人</span>，它们会摧毁你的轨迹<br>
+    碰到红色敌人会失去生命<br>
+    收集<span style="color:#ffcc00">能量球</span>获取增益效果
+  </div>
+  <button class="btn" id="startBtn">开始游戏</button>
+</div>
+
+<div id="gameover-screen" class="hidden">
+  <h2>游戏结束</h2>
+  <div class="gameover-score" id="finalScore">0</div>
+  <div class="gameover-high" id="highScoreText">最高分: 0</div>
+  <button class="btn" id="restartBtn">再来一次</button>
+</div>
+
+<div id="level-screen" class="hidden">
+  <div class="level-text" id="levelText">第 1 关</div>
+  <div class="level-sub" id="levelSub">准备...</div>
+</div>
+
+<div id="hud" class="hidden">
+  <div>
+    <div class="hud-item">
+      <span class="hud-label">分数</span>
+      <span class="hud-value" id="scoreDisplay">0</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">关卡</span>
+      <span class="hud-value" id="levelDisplay">1</span>
+    </div>
+    <div id="powerupDisplay"></div>
+  </div>
+  <div>
+    <div class="hud-item">
+      <span class="hud-label">生命</span>
+      <span class="hud-lives" id="livesDisplay"></span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">最高</span>
+      <span class="hud-value" id="hudHighScore">0</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== GAME SETUP =====
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// ===== CONSTANTS =====
+const TRAIL_MAX_AGE = 4000;
+const TRAIL_MIN_DIST = 4;
+const LOOP_CHECK_INTERVAL = 150;
+const ENEMY_TYPES = {
+  small:  { radius: 12, speed: 1.5, points: 100, color: '#00ffcc', glow: '#00ffcc' },
+  medium: { radius: 20, speed: 2.2, points: 250, color: '#7b2fff', glow: '#7b2fff' },
+  large:  { radius: 32, speed: 0.8, points: 500, color: '#00aaff', glow: '#00aaff' },
+  red:    { radius: 16, speed: 2.0, points: 50,  color: '#ff2d55', glow: '#ff2d55' }
+};
+const POWERUP_TYPES = {
+  trail:  { color: '#ffcc00', glow: '#ffcc00', label: '延长轨迹', duration: 8000 },
+  slow:   { color: '#00ccff', glow: '#00ccff', label: '减速时间', duration: 6000 },
+  multi:  { color: '#ff66ff', glow: '#ff66ff', label: '双倍分数', duration: 7000 }
+};
+
+// ===== GAME STATE =====
+let state = 'start'; // start, playing, gameover, levelup
+let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+let playerPos = { x: canvas.width / 2, y: canvas.height / 2 };
+let trail = [];
+let enemies = [];
+let particles = [];
+let powerups = [];
+let score = 0;
+let highScore = parseInt(localStorage.getItem('coil_highscore') || '0');
+let lives = 3;
+let level = 1;
+let lastTime = 0;
+let loopCheckTimer = 0;
+let activePowerups = { trail: 0, slow: 0, multi: 0 };
+let invincibleTimer = 0;
+let levelEnemiesDestroyed = 0;
+let levelEnemiesRequired = 0;
+let bgStars = [];
+let frameCount = 0;
+
+// ===== INIT =====
+document.getElementById('hudHighScore').textContent = highScore;
+
+for (let i = 0; i < 120; i++) {
+  bgStars.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 1.5 + 0.3,
+    a: Math.random() * 0.5 + 0.1,
+    speed: Math.random() * 0.3 + 0.05
+  });
+}
+
+canvas.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  mouse.x = e.touches[0].clientX;
+  mouse.y = e.touches[0].clientY;
+}, { passive: false });
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('restartBtn').addEventListener('click', startGame);
+
+// ===== LEVEL CONFIG =====
+function getLevelConfig(lv) {
+  const base = {
+    small:  Math.min(3 + lv, 15),
+    medium: Math.min(Math.floor(lv / 2), 8),
+    large:  Math.min(Math.floor(lv / 3), 5),
+    red:    Math.min(Math.floor((lv - 1) / 2), 6),
+    speedMul: 1 + (lv - 1) * 0.08,
+    powerupChance: Math.max(0.008, 0.015 - lv * 0.0005)
+  };
+  base.total = base.small + base.medium + base.large + base.red;
+  return base;
+}
+
+// ===== START / RESTART =====
+function startGame() {
+  score = 0;
+  lives = 3;
+  level = 1;
+  trail = [];
+  enemies = [];
+  particles = [];
+  powerups = [];
+  activePowerups = { trail: 0, slow: 0, multi: 0 };
+  invincibleTimer = 0;
+  playerPos = { x: canvas.width / 2, y: canvas.height / 2 };
+  mouse.x = canvas.width / 2;
+  mouse.y = canvas.height / 2;
+
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+
+  updateHUD();
+  showLevelScreen();
+}
+
+function showLevelScreen() {
+  state = 'levelup';
+  const screen = document.getElementById('level-screen');
+  document.getElementById('levelText').textContent = `第 ${level} 关`;
+  const cfg = getLevelConfig(level);
+  document.getElementById('levelSub').textContent = `消灭 ${cfg.total} 个敌人`;
+  screen.classList.remove('hidden');
+
+  setTimeout(() => {
+    screen.classList.add('hidden');
+    spawnLevelEnemies();
+    state = 'playing';
+    if (!lastTime) requestAnimationFrame(gameLoop);
+  }, 1800);
+}
+
+function spawnLevelEnemies() {
+  enemies = [];
+  const cfg = getLevelConfig(level);
+  levelEnemiesDestroyed = 0;
+  levelEnemiesRequired = cfg.total;
+
+  function spawnType(type, count) {
+    for (let i = 0; i < count; i++) {
+      spawnEnemy(type, cfg.speedMul);
+    }
+  }
+  spawnType('small', cfg.small);
+  spawnType('medium', cfg.medium);
+  spawnType('large', cfg.large);
+  spawnType('red', cfg.red);
+}
+
+function spawnEnemy(type, speedMul) {
+  const t = ENEMY_TYPES[type];
+  const margin = 60;
+  let x, y;
+  // Spawn away from player
+  do {
+    x = margin + Math.random() * (canvas.width - margin * 2);
+    y = margin + Math.random() * (canvas.height - margin * 2);
+  } while (dist(x, y, playerPos.x, playerPos.y) < 150);
+
+  const angle = Math.random() * Math.PI * 2;
+  enemies.push({
+    x, y,
+    vx: Math.cos(angle) * t.speed * speedMul,
+    vy: Math.sin(angle) * t.speed * speedMul,
+    radius: t.radius,
+    type,
+    color: t.color,
+    glow: t.glow,
+    points: t.points,
+    pulse: Math.random() * Math.PI * 2,
+    alive: true
+  });
+}
+
+// ===== POWERUP SPAWN =====
+function trySpawnPowerup() {
+  if (powerups.length >= 2) return;
+  const cfg = getLevelConfig(level);
+  if (Math.random() < cfg.powerupChance) {
+    const types = Object.keys(POWERUP_TYPES);
+    const type = types[Math.floor(Math.random() * types.length)];
+    const pt = POWERUP_TYPES[type];
+    const margin = 60;
+    powerups.push({
+      x: margin + Math.random() * (canvas.width - margin * 2),
+      y: margin + Math.random() * (canvas.height - margin * 2),
+      type,
+      radius: 14,
+      color: pt.color,
+      glow: pt.glow,
+      label: pt.label,
+      duration: pt.duration,
+      pulse: Math.random() * Math.PI * 2,
+      age: 0,
+      maxAge: 10000
+    });
+  }
+}
+
+// ===== GAME LOOP =====
+function gameLoop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+  let dt = timestamp - lastTime;
+  lastTime = timestamp;
+  if (dt > 50) dt = 50;
+
+  // Slow-motion powerup
+  let timeMul = 1;
+  if (activePowerups.slow > 0) timeMul = 0.5;
+
+  frameCount++;
+
+  if (state === 'playing') {
+    update(dt, timeMul);
+  }
+  draw(dt);
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ===== UPDATE =====
+function update(dt, timeMul) {
+  const effectiveDt = dt * timeMul;
+
+  // Move player toward mouse smoothly
+  const dx = mouse.x - playerPos.x;
+  const dy = mouse.y - playerPos.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  const speed = 12;
+  if (d > 2) {
+    playerPos.x += (dx / d) * Math.min(d, speed);
+    playerPos.y += (dy / d) * Math.min(d, speed);
+  }
+
+  // Add trail point
+  const lastTrail = trail[trail.length - 1];
+  if (!lastTrail || dist(playerPos.x, playerPos.y, lastTrail.x, lastTrail.y) > TRAIL_MIN_DIST) {
+    trail.push({ x: playerPos.x, y: playerPos.y, time: performance.now() });
+  }
+
+  // Fade trail
+  const trailDuration = activePowerups.trail > 0 ? TRAIL_MAX_AGE * 2 : TRAIL_MAX_AGE;
+  const now = performance.now();
+  trail = trail.filter(p => now - p.time < trailDuration);
+
+  // Update powerup timers
+  for (const key of Object.keys(activePowerups)) {
+    if (activePowerups[key] > 0) {
+      activePowerups[key] -= dt;
+      if (activePowerups[key] <= 0) activePowerups[key] = 0;
+    }
+  }
+
+  // Invincibility timer
+  if (invincibleTimer > 0) invincibleTimer -= dt;
+
+  // Update enemies
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    e.x += e.vx * timeMul;
+    e.y += e.vy * timeMul;
+    e.pulse += effectiveDt * 0.003;
+
+    // Bounce off walls
+    if (e.x - e.radius < 0) { e.x = e.radius; e.vx = Math.abs(e.vx); }
+    if (e.x + e.radius > canvas.width) { e.x = canvas.width - e.radius; e.vx = -Math.abs(e.vx); }
+    if (e.y - e.radius < 0) { e.y = e.radius; e.vy = Math.abs(e.vy); }
+    if (e.y + e.radius > canvas.height) { e.y = canvas.height - e.radius; e.vy = -Math.abs(e.vy); }
+
+    // Red enemy: destroy trail on contact & hurt player
+    if (e.type === 'red') {
+      // Check trail contact
+      for (let i = trail.length - 1; i >= 0; i--) {
+        if (dist(e.x, e.y, trail[i].x, trail[i].y) < e.radius + 4) {
+          // Remove nearby trail points
+          trail = trail.filter(p => dist(e.x, e.y, p.x, p.y) > e.radius + 20);
+          spawnParticles(e.x, e.y, '#ff2d55', 5);
+          break;
+        }
+      }
+      // Hurt player
+      if (invincibleTimer <= 0 && dist(e.x, e.y, playerPos.x, playerPos.y) < e.radius + 8) {
+        loseLife();
+      }
+    }
+  }
+
+  // Powerup collection
+  for (let i = powerups.length - 1; i >= 0; i--) {
+    const p = powerups[i];
+    p.pulse += effectiveDt * 0.004;
+    p.age += dt;
+    if (p.age > p.maxAge) {
+      powerups.splice(i, 1);
+      continue;
+    }
+    if (dist(playerPos.x, playerPos.y, p.x, p.y) < p.radius + 10) {
+      activePowerups[p.type] = p.duration;
+      spawnParticles(p.x, p.y, p.color, 12);
+      showScorePopup(p.x, p.y, p.label, p.color);
+      powerups.splice(i, 1);
+    }
+  }
+
+  // Try spawn powerup
+  trySpawnPowerup();
+
+  // Loop detection
+  loopCheckTimer += dt;
+  if (loopCheckTimer >= LOOP_CHECK_INTERVAL) {
+    loopCheckTimer = 0;
+    checkLoopCapture();
+  }
+
+  // Update particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * timeMul;
+    p.y += p.vy * timeMul;
+    p.life -= dt;
+    p.vx *= 0.97;
+    p.vy *= 0.97;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // Check level completion
+  if (enemies.every(e => !e.alive)) {
+    level++;
+    trail = [];
+    showLevelScreen();
+  }
+
+  updateHUD();
+}
+
+// ===== LOOP DETECTION =====
+function checkLoopCapture() {
+  if (trail.length < 20) return;
+
+  // Look for self-intersections to find closed loops
+  const len = trail.length;
+  // We check if the newest segment crosses an older segment
+  for (let i = 0; i < len - 15; i++) {
+    const dToHead = dist(trail[i].x, trail[i].y, playerPos.x, playerPos.y);
+    if (dToHead < 20) {
+      // Potential loop from index i to end
+      const loopPoints = trail.slice(i);
+      if (loopPoints.length < 15) continue;
+
+      // Calculate loop area to ensure it's a real loop
+      const area = polygonArea(loopPoints);
+      if (Math.abs(area) < 800) continue;
+
+      // Check which enemies are inside the loop
+      const captured = [];
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        if (pointInPolygon(e.x, e.y, loopPoints)) {
+          captured.push(e);
+        }
+      }
+
+      if (captured.length > 0) {
+        let basePoints = 0;
+        for (const e of captured) {
+          e.alive = false;
+          basePoints += e.points;
+          spawnParticles(e.x, e.y, e.color, 20);
+          levelEnemiesDestroyed++;
+        }
+
+        // Bonus for multi-capture
+        const multiplier = captured.length > 1 ? captured.length * 1.5 : 1;
+        const scoreMultiplier = activePowerups.multi > 0 ? 2 : 1;
+        const totalPoints = Math.round(basePoints * multiplier * scoreMultiplier);
+        score += totalPoints;
+
+        // Show score popup at center of loop
+        const cx = loopPoints.reduce((s, p) => s + p.x, 0) / loopPoints.length;
+        const cy = loopPoints.reduce((s, p) => s + p.y, 0) / loopPoints.length;
+        let text = `+${totalPoints}`;
+        if (captured.length > 1) text += ` (x${captured.length})`;
+        showScorePopup(cx, cy, text, '#00ffcc');
+
+        // Flash the loop
+        spawnLoopParticles(loopPoints, captured.length > 1 ? '#ffcc00' : '#00ffcc');
+
+        // Remove used trail
+        trail = trail.slice(0, i);
+        break;
+      }
+    }
+  }
+}
+
+function polygonArea(pts) {
+  let area = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    area += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y);
+  }
+  return area / 2;
+}
+
+function pointInPolygon(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+// ===== PARTICLES =====
+function spawnParticles(x, y, color, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 3 + 1;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 600 + Math.random() * 400,
+      maxLife: 1000,
+      radius: Math.random() * 3 + 1,
+      color
+    });
+  }
+}
+
+function spawnLoopParticles(loopPoints, color) {
+  const step = Math.max(1, Math.floor(loopPoints.length / 30));
+  for (let i = 0; i < loopPoints.length; i += step) {
+    const p = loopPoints[i];
+    const angle = Math.random() * Math.PI * 2;
+    particles.push({
+      x: p.x, y: p.y,
+      vx: Math.cos(angle) * 2,
+      vy: Math.sin(angle) * 2,
+      life: 500 + Math.random() * 300,
+      maxLife: 800,
+      radius: Math.random() * 2 + 1,
+      color
+    });
+  }
+}
+
+// ===== LIFE & GAMEOVER =====
+function loseLife() {
+  lives--;
+  invincibleTimer = 2000;
+  spawnParticles(playerPos.x, playerPos.y, '#ff2d55', 30);
+  trail = [];
+
+  if (lives <= 0) {
+    gameOver();
+  }
+  updateHUD();
+}
+
+function gameOver() {
+  state = 'gameover';
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('coil_highscore', highScore.toString());
+  }
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('highScoreText').textContent = `最高分: ${highScore}`;
+  document.getElementById('gameover-screen').classList.remove('hidden');
+  document.getElementById('hud').classList.add('hidden');
+}
+
+// ===== HUD =====
+function updateHUD() {
+  document.getElementById('scoreDisplay').textContent = score;
+  document.getElementById('levelDisplay').textContent = level;
+  document.getElementById('hudHighScore').textContent = highScore;
+  let livesStr = '';
+  for (let i = 0; i < lives; i++) livesStr += '\u2764 ';
+  document.getElementById('livesDisplay').textContent = livesStr;
+
+  // Powerup indicators
+  let pwHTML = '';
+  if (activePowerups.trail > 0)
+    pwHTML += `<span class="powerup-indicator" style="background:rgba(255,204,0,0.25);color:#ffcc00;">延长轨迹 ${Math.ceil(activePowerups.trail/1000)}s</span>`;
+  if (activePowerups.slow > 0)
+    pwHTML += `<span class="powerup-indicator" style="background:rgba(0,204,255,0.25);color:#00ccff;">减速时间 ${Math.ceil(activePowerups.slow/1000)}s</span>`;
+  if (activePowerups.multi > 0)
+    pwHTML += `<span class="powerup-indicator" style="background:rgba(255,102,255,0.25);color:#ff66ff;">双倍分数 ${Math.ceil(activePowerups.multi/1000)}s</span>`;
+  document.getElementById('powerupDisplay').innerHTML = pwHTML;
+}
+
+function showScorePopup(x, y, text, color) {
+  const div = document.createElement('div');
+  div.className = 'score-popup';
+  div.style.left = x + 'px';
+  div.style.top = y + 'px';
+  div.style.color = color;
+  div.style.textShadow = `0 0 10px ${color}`;
+  div.textContent = text;
+  document.body.appendChild(div);
+  setTimeout(() => div.remove(), 1000);
+}
+
+// ===== DRAW =====
+function draw(dt) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background gradient
+  const bg = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 0, canvas.width/2, canvas.height/2, canvas.width * 0.7);
+  bg.addColorStop(0, '#10101f');
+  bg.addColorStop(1, '#06060e');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Stars
+  for (const s of bgStars) {
+    s.y += s.speed;
+    if (s.y > canvas.height) { s.y = 0; s.x = Math.random() * canvas.width; }
+    const flicker = 0.5 + 0.5 * Math.sin(frameCount * 0.02 + s.x);
+    ctx.globalAlpha = s.a * flicker;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Draw trail
+  drawTrail();
+
+  // Draw powerups
+  for (const p of powerups) {
+    const fadeOut = p.age > p.maxAge - 2000 ? (p.maxAge - p.age) / 2000 : 1;
+    const pulseR = 1 + 0.3 * Math.sin(p.pulse);
+    ctx.globalAlpha = 0.7 * fadeOut;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = p.glow;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius * pulseR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner star shape
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.8 * fadeOut;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+
+  // Draw enemies
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const pulseR = 1 + 0.12 * Math.sin(e.pulse);
+    const r = e.radius * pulseR;
+
+    // Outer glow
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = e.glow;
+
+    // Body
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = e.color;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, r + 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = e.color;
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner highlight
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(e.x - r * 0.25, e.y - r * 0.25, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+
+    // Type marker for red enemies
+    if (e.type === 'red') {
+      ctx.strokeStyle = '#ff2d55';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(e.pulse * 2);
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, r + 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Draw particles
+  for (const p of particles) {
+    const alpha = p.life / p.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = p.color;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+
+  // Draw player cursor
+  if (state === 'playing') {
+    drawCursor();
+  }
+}
+
+function drawTrail() {
+  if (trail.length < 2) return;
+  const now = performance.now();
+  const trailDuration = activePowerups.trail > 0 ? TRAIL_MAX_AGE * 2 : TRAIL_MAX_AGE;
+
+  // Glow layer
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw multiple passes for glow effect
+  for (let pass = 0; pass < 3; pass++) {
+    const widths = [10, 5, 2];
+    const alphas = [0.15, 0.4, 0.9];
+
+    ctx.lineWidth = widths[pass];
+    ctx.beginPath();
+    let started = false;
+
+    for (let i = 0; i < trail.length; i++) {
+      const p = trail[i];
+      const age = now - p.time;
+      const alpha = Math.max(0, 1 - age / trailDuration) * alphas[pass];
+
+      if (alpha <= 0) continue;
+
+      if (!started) {
+        ctx.moveTo(p.x, p.y);
+        started = true;
+      } else {
+        ctx.lineTo(p.x, p.y);
+      }
+    }
+
+    if (pass === 0) {
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#00ffcc';
+    } else if (pass === 1) {
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#00ffcc';
+    } else {
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = '#ffffff';
+    }
+
+    // Gradient along trail
+    if (trail.length >= 2) {
+      const grad = ctx.createLinearGradient(
+        trail[0].x, trail[0].y,
+        trail[trail.length-1].x, trail[trail.length-1].y
+      );
+      const oldest = Math.max(0, 1 - (now - trail[0].time) / trailDuration);
+      if (pass === 2) {
+        grad.addColorStop(0, `rgba(255,255,255,${oldest * 0.3})`);
+        grad.addColorStop(1, `rgba(255,255,255,0.9)`);
+      } else {
+        grad.addColorStop(0, `rgba(0,255,204,${oldest * alphas[pass]})`);
+        grad.addColorStop(1, `rgba(0,255,204,${alphas[pass]})`);
+      }
+      ctx.strokeStyle = grad;
+    }
+
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur = 0;
+}
+
+function drawCursor() {
+  const blink = invincibleTimer > 0 && Math.floor(invincibleTimer / 100) % 2 === 0;
+  if (blink) return;
+
+  // Outer ring
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = '#00ffcc';
+  ctx.strokeStyle = '#00ffcc';
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.6 + 0.3 * Math.sin(frameCount * 0.08);
+  ctx.beginPath();
+  ctx.arc(playerPos.x, playerPos.y, 14, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inner dot
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = '#00ffcc';
+  ctx.beginPath();
+  ctx.arc(playerPos.x, playerPos.y, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crosshair lines
+  ctx.globalAlpha = 0.4;
+  ctx.strokeStyle = '#00ffcc';
+  ctx.lineWidth = 1;
+  const cLen = 8;
+  const cOff = 18;
+  for (let a = 0; a < 4; a++) {
+    const angle = a * Math.PI / 2 + frameCount * 0.01;
+    ctx.beginPath();
+    ctx.moveTo(playerPos.x + Math.cos(angle) * cOff, playerPos.y + Math.sin(angle) * cOff);
+    ctx.lineTo(playerPos.x + Math.cos(angle) * (cOff + cLen), playerPos.y + Math.sin(angle) * (cOff + cLen));
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+}
+
+// ===== UTILITY =====
+function dist(x1, y1, x2, y2) {
+  const dx = x1 - x2, dy = y1 - y2;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// ===== KICK OFF RENDER LOOP (for start screen background) =====
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

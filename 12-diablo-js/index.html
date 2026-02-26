@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>暗黑破坏者</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'SimHei', 'Microsoft YaHei', sans-serif;
+  cursor: default;
+  user-select: none;
+}
+canvas { display: block; }
+#gameCanvas { position: absolute; top: 0; left: 0; }
+#uiCanvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+#titleScreen {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, #1a0000 0%, #000 70%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 100;
+}
+#titleScreen h1 {
+  font-size: 72px; color: #c41010; text-shadow: 0 0 30px #ff0000, 0 0 60px #880000;
+  margin-bottom: 20px; letter-spacing: 12px;
+}
+#titleScreen .subtitle {
+  font-size: 20px; color: #886644; margin-bottom: 60px; letter-spacing: 4px;
+}
+#titleScreen button {
+  font-family: inherit; font-size: 28px; color: #ccaa77;
+  background: linear-gradient(180deg, #2a1a0a, #1a0a00);
+  border: 2px solid #664422; padding: 15px 60px; cursor: pointer;
+  letter-spacing: 6px; transition: all 0.3s;
+}
+#titleScreen button:hover {
+  color: #ffdd99; border-color: #aa7744;
+  box-shadow: 0 0 20px rgba(170, 100, 30, 0.5);
+}
+
+#deathScreen {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(80, 0, 0, 0.85);
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 90;
+}
+#deathScreen h1 {
+  font-size: 64px; color: #ff2222; text-shadow: 0 0 30px #ff0000;
+  margin-bottom: 20px;
+}
+#deathScreen p { font-size: 22px; color: #cc8866; margin-bottom: 40px; }
+#deathScreen button {
+  font-family: inherit; font-size: 24px; color: #ccaa77;
+  background: linear-gradient(180deg, #2a1a0a, #1a0a00);
+  border: 2px solid #664422; padding: 12px 50px; cursor: pointer;
+  letter-spacing: 4px;
+}
+#deathScreen button:hover { color: #ffdd99; border-color: #aa7744; }
+
+#levelUpMsg {
+  position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 48px; color: #ffdd44; text-shadow: 0 0 20px #ffaa00;
+  display: none; z-index: 80; pointer-events: none; letter-spacing: 6px;
+}
+
+#floorMsg {
+  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 36px; color: #aaaaff; text-shadow: 0 0 20px #4444ff;
+  display: none; z-index: 80; pointer-events: none; letter-spacing: 4px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+<canvas id="uiCanvas"></canvas>
+
+<div id="titleScreen">
+  <h1>暗黑破坏者</h1>
+  <div class="subtitle">黑暗降临 - 勇者觉醒</div>
+  <button onclick="startGame()">开始冒险</button>
+</div>
+
+<div id="deathScreen">
+  <h1>你已死亡</h1>
+  <p id="deathInfo"></p>
+  <button onclick="restartGame()">重新开始</button>
+</div>
+
+<div id="levelUpMsg">等级提升!</div>
+<div id="floorMsg"></div>
+
+<script>
+// ==================== CONFIGURATION ====================
+const TILE_W = 64;
+const TILE_H = 32;
+const MAP_SIZE = 50;
+const VISIBILITY_RADIUS = 7;
+const TORCH_RADIUS = 6;
+
+// ==================== CANVAS SETUP ====================
+const gameCanvas = document.getElementById('gameCanvas');
+const gctx = gameCanvas.getContext('2d');
+const uiCanvas = document.getElementById('uiCanvas');
+const uctx = uiCanvas.getContext('2d');
+
+let W, H;
+function resizeCanvases() {
+  W = window.innerWidth; H = window.innerHeight;
+  gameCanvas.width = W; gameCanvas.height = H;
+  uiCanvas.width = W; uiCanvas.height = H;
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+// ==================== TILE TYPES ====================
+const TILE_FLOOR = 0;
+const TILE_WALL = 1;
+const TILE_STAIRS = 2;
+const TILE_TORCH = 3;
+
+// ==================== GAME STATE ====================
+let gameRunning = false;
+let showMinimap = false;
+let camera = { x: 0, y: 0 };
+let dungeon = [];
+let explored = [];
+let currentFloor = 1;
+let floatingTexts = [];
+let particles = [];
+let items = [];
+let torchFlicker = 0;
+let gameTime = 0;
+let mouseScreenX = 0, mouseScreenY = 0;
+
+// ==================== PLAYER ====================
+let player = null;
+
+function createPlayer(x, y) {
+  return {
+    x: x, y: y,
+    targetX: x, targetY: y,
+    path: [],
+    hp: 100, maxHp: 100,
+    mp: 50, maxMp: 50,
+    level: 1, xp: 0, xpToNext: 100,
+    attack: 10, defense: 3,
+    gold: 0,
+    potions: 3,
+    speed: 0.06,
+    attackRange: 1.5,
+    attackCooldown: 0,
+    attackTarget: null,
+    animState: 'idle',
+    animTimer: 0,
+    facingRight: true,
+    swingAngle: 0,
+    invulnTimer: 0
+  };
+}
+
+// ==================== ENEMIES ====================
+let enemies = [];
+
+const ENEMY_TYPES = {
+  skeleton: {
+    name: '骷髅兵', hp: 30, attack: 5, defense: 1, xp: 20, speed: 0.03,
+    color: '#ccccaa', goldDrop: [2, 8], potionChance: 0.2
+  },
+  zombie: {
+    name: '僵尸', hp: 50, attack: 8, defense: 2, xp: 35, speed: 0.02,
+    color: '#448844', goldDrop: [5, 15], potionChance: 0.3
+  },
+  demon: {
+    name: '恶魔', hp: 80, attack: 12, defense: 4, xp: 60, speed: 0.035,
+    color: '#cc3333', goldDrop: [10, 25], potionChance: 0.4
+  },
+  boss: {
+    name: '暗黑领主', hp: 200, attack: 20, defense: 8, xp: 200, speed: 0.025,
+    color: '#ff4400', goldDrop: [50, 100], potionChance: 1.0
+  }
+};
+
+function createEnemy(type, x, y) {
+  const t = ENEMY_TYPES[type];
+  const floorMult = 1 + (currentFloor - 1) * 0.3;
+  return {
+    type: type,
+    name: t.name,
+    x: x, y: y,
+    hp: Math.floor(t.hp * floorMult),
+    maxHp: Math.floor(t.hp * floorMult),
+    attack: Math.floor(t.attack * floorMult),
+    defense: Math.floor(t.defense * floorMult),
+    xp: Math.floor(t.xp * floorMult),
+    speed: t.speed,
+    color: t.color,
+    goldDrop: t.goldDrop.map(g => Math.floor(g * floorMult)),
+    potionChance: t.potionChance,
+    state: 'patrol',
+    patrolTarget: null,
+    attackCooldown: 0,
+    animTimer: 0,
+    hitTimer: 0,
+    facingRight: true,
+    homeX: x, homeY: y
+  };
+}
+
+// ==================== MAP GENERATION ====================
+function generateDungeon() {
+  dungeon = [];
+  explored = [];
+  for (let y = 0; y < MAP_SIZE; y++) {
+    dungeon[y] = [];
+    explored[y] = [];
+    for (let x = 0; x < MAP_SIZE; x++) {
+      dungeon[y][x] = TILE_WALL;
+      explored[y][x] = false;
+    }
+  }
+
+  const rooms = [];
+  const numRooms = 8 + Math.floor(Math.random() * 5) + currentFloor;
+
+  for (let i = 0; i < numRooms * 3; i++) {
+    if (rooms.length >= numRooms) break;
+    const w = 4 + Math.floor(Math.random() * 5);
+    const h = 4 + Math.floor(Math.random() * 5);
+    const x = 2 + Math.floor(Math.random() * (MAP_SIZE - w - 4));
+    const y = 2 + Math.floor(Math.random() * (MAP_SIZE - h - 4));
+
+    let overlaps = false;
+    for (const r of rooms) {
+      if (x - 1 < r.x + r.w && x + w + 1 > r.x && y - 1 < r.y + r.h && y + h + 1 > r.y) {
+        overlaps = true; break;
+      }
+    }
+    if (!overlaps) {
+      rooms.push({ x, y, w, h, cx: Math.floor(x + w / 2), cy: Math.floor(y + h / 2) });
+      for (let ry = y; ry < y + h; ry++)
+        for (let rx = x; rx < x + w; rx++)
+          dungeon[ry][rx] = TILE_FLOOR;
+    }
+  }
+
+  // Connect rooms with corridors
+  for (let i = 1; i < rooms.length; i++) {
+    const a = rooms[i - 1], b = rooms[i];
+    let cx = a.cx, cy = a.cy;
+    while (cx !== b.cx) {
+      if (cy >= 0 && cy < MAP_SIZE && cx >= 0 && cx < MAP_SIZE) {
+        dungeon[cy][cx] = TILE_FLOOR;
+        if (cy + 1 < MAP_SIZE) dungeon[cy + 1][cx] = TILE_FLOOR;
+      }
+      cx += cx < b.cx ? 1 : -1;
+    }
+    while (cy !== b.cy) {
+      if (cy >= 0 && cy < MAP_SIZE && cx >= 0 && cx < MAP_SIZE) {
+        dungeon[cy][cx] = TILE_FLOOR;
+        if (cx + 1 < MAP_SIZE) dungeon[cy][cx + 1] = TILE_FLOOR;
+      }
+      cy += cy < b.cy ? 1 : -1;
+    }
+  }
+
+  // Place torches in rooms
+  for (const r of rooms) {
+    if (Math.random() < 0.7) {
+      const tx = r.x + 1;
+      const ty = r.y + 1;
+      if (dungeon[ty][tx] === TILE_FLOOR) dungeon[ty][tx] = TILE_TORCH;
+    }
+    if (Math.random() < 0.7) {
+      const tx = r.x + r.w - 2;
+      const ty = r.y + 1;
+      if (dungeon[ty][tx] === TILE_FLOOR) dungeon[ty][tx] = TILE_TORCH;
+    }
+  }
+
+  // Place stairs in last room
+  const lastRoom = rooms[rooms.length - 1];
+  dungeon[lastRoom.cy][lastRoom.cx] = TILE_STAIRS;
+
+  // Player start in first room
+  const firstRoom = rooms[0];
+  const startX = firstRoom.cx;
+  const startY = firstRoom.cy;
+
+  // Spawn enemies
+  enemies = [];
+  for (let i = 1; i < rooms.length; i++) {
+    const r = rooms[i];
+    const numEnemies = 2 + Math.floor(Math.random() * 3) + Math.floor(currentFloor / 2);
+    for (let e = 0; e < numEnemies; e++) {
+      const ex = r.x + 1 + Math.floor(Math.random() * (r.w - 2));
+      const ey = r.y + 1 + Math.floor(Math.random() * (r.h - 2));
+      if (dungeon[ey][ex] === TILE_FLOOR) {
+        let type;
+        const roll = Math.random();
+        if (currentFloor >= 3 && roll < 0.15) type = 'demon';
+        else if (currentFloor >= 2 && roll < 0.35) type = 'zombie';
+        else type = 'skeleton';
+        enemies.push(createEnemy(type, ex, ey));
+      }
+    }
+  }
+
+  // Spawn boss on every 3rd floor
+  if (currentFloor % 3 === 0) {
+    const bossRoom = rooms[rooms.length - 2] || lastRoom;
+    enemies.push(createEnemy('boss', bossRoom.cx, bossRoom.cy));
+  }
+
+  items = [];
+
+  return { startX, startY };
+}
+
+// ==================== PATHFINDING (A*) ====================
+function findPath(sx, sy, ex, ey) {
+  sx = Math.round(sx); sy = Math.round(sy);
+  ex = Math.round(ex); ey = Math.round(ey);
+
+  if (ex < 0 || ex >= MAP_SIZE || ey < 0 || ey >= MAP_SIZE) return [];
+  if (dungeon[ey][ex] === TILE_WALL) return [];
+
+  const open = [];
+  const closed = new Set();
+  const gScore = {};
+  const fScore = {};
+  const cameFrom = {};
+
+  const key = (x, y) => x + ',' + y;
+  const h = (x, y) => Math.abs(x - ex) + Math.abs(y - ey);
+
+  const startKey = key(sx, sy);
+  gScore[startKey] = 0;
+  fScore[startKey] = h(sx, sy);
+  open.push({ x: sx, y: sy, f: fScore[startKey] });
+
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+  let iterations = 0;
+
+  while (open.length > 0 && iterations < 2000) {
+    iterations++;
+    open.sort((a, b) => a.f - b.f);
+    const current = open.shift();
+    const ck = key(current.x, current.y);
+
+    if (current.x === ex && current.y === ey) {
+      const path = [];
+      let k = ck;
+      while (k) {
+        const [px, py] = k.split(',').map(Number);
+        path.unshift({ x: px, y: py });
+        k = cameFrom[k];
+      }
+      return path;
+    }
+
+    closed.add(ck);
+
+    for (const [dx, dy] of dirs) {
+      const nx = current.x + dx, ny = current.y + dy;
+      if (nx < 0 || nx >= MAP_SIZE || ny < 0 || ny >= MAP_SIZE) continue;
+      if (dungeon[ny][nx] === TILE_WALL) continue;
+      const nk = key(nx, ny);
+      if (closed.has(nk)) continue;
+
+      // Diagonal movement check
+      if (dx !== 0 && dy !== 0) {
+        if (dungeon[current.y + dy][current.x] === TILE_WALL ||
+            dungeon[current.y][current.x + dx] === TILE_WALL) continue;
+      }
+
+      const ng = gScore[ck] + (dx !== 0 && dy !== 0 ? 1.414 : 1);
+      if (ng < (gScore[nk] || Infinity)) {
+        cameFrom[nk] = ck;
+        gScore[nk] = ng;
+        fScore[nk] = ng + h(nx, ny);
+        if (!open.find(o => o.x === nx && o.y === ny)) {
+          open.push({ x: nx, y: ny, f: fScore[nk] });
+        }
+      }
+    }
+  }
+  return [];
+}
+
+// ==================== COORDINATE CONVERSION ====================
+function toIso(x, y) {
+  return {
+    sx: (x - y) * (TILE_W / 2),
+    sy: (x + y) * (TILE_H / 2)
+  };
+}
+
+function fromIso(sx, sy) {
+  const x = (sx / (TILE_W / 2) + sy / (TILE_H / 2)) / 2;
+  const y = (sy / (TILE_H / 2) - sx / (TILE_W / 2)) / 2;
+  return { x, y };
+}
+
+function worldToScreen(wx, wy) {
+  const iso = toIso(wx, wy);
+  return {
+    sx: iso.sx - camera.x + W / 2,
+    sy: iso.sy - camera.y + H / 2
+  };
+}
+
+function screenToWorld(sx, sy) {
+  const isoX = sx + camera.x - W / 2;
+  const isoY = sy + camera.y - H / 2;
+  return fromIso(isoX, isoY);
+}
+
+// ==================== DRAWING FUNCTIONS ====================
+function drawIsoDiamond(ctx, sx, sy, w, h, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - h / 2);
+  ctx.lineTo(sx + w / 2, sy);
+  ctx.lineTo(sx, sy + h / 2);
+  ctx.lineTo(sx - w / 2, sy);
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+}
+
+function getTileColor(tile, tx, ty) {
+  // Variation based on position
+  const v = ((tx * 7 + ty * 13) % 5) * 3;
+  switch (tile) {
+    case TILE_FLOOR: return `rgb(${40 + v}, ${35 + v}, ${30 + v})`;
+    case TILE_WALL: return `rgb(${25 + v}, ${22 + v}, ${20 + v})`;
+    case TILE_STAIRS: return '#4444aa';
+    case TILE_TORCH: return `rgb(${40 + v}, ${35 + v}, ${30 + v})`;
+    default: return '#222';
+  }
+}
+
+function drawTile(tx, ty) {
+  const { sx, sy } = worldToScreen(tx, ty);
+  if (sx < -TILE_W || sx > W + TILE_W || sy < -TILE_H * 3 || sy > H + TILE_H * 3) return;
+
+  const tile = dungeon[ty][tx];
+  const color = getTileColor(tile, tx, ty);
+
+  if (tile === TILE_WALL) {
+    // Draw wall block (3D look)
+    const wallH = 20;
+    // Top face
+    drawIsoDiamond(gctx, sx, sy - wallH, TILE_W, TILE_H, color, '#1a1815');
+    // Left face
+    gctx.beginPath();
+    gctx.moveTo(sx - TILE_W / 2, sy - wallH);
+    gctx.lineTo(sx, sy + TILE_H / 2 - wallH);
+    gctx.lineTo(sx, sy + TILE_H / 2);
+    gctx.lineTo(sx - TILE_W / 2, sy);
+    gctx.closePath();
+    const v = ((tx * 7 + ty * 13) % 5) * 2;
+    gctx.fillStyle = `rgb(${18 + v}, ${16 + v}, ${14 + v})`;
+    gctx.fill();
+    gctx.strokeStyle = '#1a1815';
+    gctx.lineWidth = 0.5;
+    gctx.stroke();
+    // Right face
+    gctx.beginPath();
+    gctx.moveTo(sx + TILE_W / 2, sy - wallH);
+    gctx.lineTo(sx, sy + TILE_H / 2 - wallH);
+    gctx.lineTo(sx, sy + TILE_H / 2);
+    gctx.lineTo(sx + TILE_W / 2, sy);
+    gctx.closePath();
+    gctx.fillStyle = `rgb(${15 + v}, ${13 + v}, ${11 + v})`;
+    gctx.fill();
+    gctx.strokeStyle = '#1a1815';
+    gctx.lineWidth = 0.5;
+    gctx.stroke();
+  } else {
+    drawIsoDiamond(gctx, sx, sy, TILE_W, TILE_H, color, '#1a1815');
+
+    // Stairs
+    if (tile === TILE_STAIRS) {
+      drawIsoDiamond(gctx, sx, sy, TILE_W * 0.6, TILE_H * 0.6, '#6666cc', '#8888ff');
+      gctx.fillStyle = '#aaaaff';
+      gctx.font = '10px SimHei';
+      gctx.textAlign = 'center';
+      gctx.fillText('▼', sx, sy + 4);
+    }
+
+    // Torch
+    if (tile === TILE_TORCH) {
+      const flick = Math.sin(gameTime * 5 + tx * 3 + ty * 7) * 3;
+      gctx.fillStyle = '#553311';
+      gctx.fillRect(sx - 2, sy - 18, 4, 14);
+      // Flame
+      const gradient = gctx.createRadialGradient(sx, sy - 22 + flick, 1, sx, sy - 20 + flick, 8);
+      gradient.addColorStop(0, 'rgba(255, 200, 50, 0.9)');
+      gradient.addColorStop(0.5, 'rgba(255, 100, 20, 0.6)');
+      gradient.addColorStop(1, 'rgba(255, 50, 0, 0)');
+      gctx.fillStyle = gradient;
+      gctx.beginPath();
+      gctx.arc(sx, sy - 20 + flick, 8, 0, Math.PI * 2);
+      gctx.fill();
+    }
+  }
+}
+
+function drawPlayer() {
+  const { sx, sy } = worldToScreen(player.x, player.y);
+  const bob = Math.sin(gameTime * 4) * 2;
+
+  // Shadow
+  gctx.fillStyle = 'rgba(0,0,0,0.4)';
+  gctx.beginPath();
+  gctx.ellipse(sx, sy + 2, 12, 6, 0, 0, Math.PI * 2);
+  gctx.fill();
+
+  // Body
+  const bodyY = sy - 16 + bob;
+
+  // Legs
+  gctx.strokeStyle = '#554433';
+  gctx.lineWidth = 3;
+  const legAnim = Math.sin(gameTime * 8) * 3;
+  if (player.path.length > 0) {
+    gctx.beginPath();
+    gctx.moveTo(sx - 4, bodyY + 12);
+    gctx.lineTo(sx - 5 + legAnim, sy + 1);
+    gctx.stroke();
+    gctx.beginPath();
+    gctx.moveTo(sx + 4, bodyY + 12);
+    gctx.lineTo(sx + 5 - legAnim, sy + 1);
+    gctx.stroke();
+  } else {
+    gctx.beginPath();
+    gctx.moveTo(sx - 4, bodyY + 12);
+    gctx.lineTo(sx - 5, sy + 1);
+    gctx.stroke();
+    gctx.beginPath();
+    gctx.moveTo(sx + 4, bodyY + 12);
+    gctx.lineTo(sx + 5, sy + 1);
+    gctx.stroke();
+  }
+
+  // Armor body
+  gctx.fillStyle = '#445566';
+  gctx.beginPath();
+  gctx.moveTo(sx - 8, bodyY + 2);
+  gctx.lineTo(sx + 8, bodyY + 2);
+  gctx.lineTo(sx + 6, bodyY + 14);
+  gctx.lineTo(sx - 6, bodyY + 14);
+  gctx.closePath();
+  gctx.fill();
+  gctx.strokeStyle = '#334455';
+  gctx.lineWidth = 1;
+  gctx.stroke();
+
+  // Shoulder pads
+  gctx.fillStyle = '#556677';
+  gctx.beginPath();
+  gctx.ellipse(sx - 9, bodyY + 3, 5, 3, 0, 0, Math.PI * 2);
+  gctx.fill();
+  gctx.beginPath();
+  gctx.ellipse(sx + 9, bodyY + 3, 5, 3, 0, 0, Math.PI * 2);
+  gctx.fill();
+
+  // Head
+  gctx.fillStyle = '#ddbb99';
+  gctx.beginPath();
+  gctx.arc(sx, bodyY - 5, 6, 0, Math.PI * 2);
+  gctx.fill();
+
+  // Helmet
+  gctx.fillStyle = '#667788';
+  gctx.beginPath();
+  gctx.arc(sx, bodyY - 7, 7, Math.PI, 0);
+  gctx.fill();
+
+  // Eyes
+  gctx.fillStyle = '#fff';
+  const eyeDir = player.facingRight ? 2 : -2;
+  gctx.fillRect(sx + eyeDir - 1, bodyY - 6, 2, 2);
+
+  // Weapon (sword)
+  gctx.save();
+  const weaponX = player.facingRight ? sx + 10 : sx - 10;
+  gctx.translate(weaponX, bodyY + 5);
+  const swing = player.swingAngle || 0;
+  gctx.rotate(swing + (player.facingRight ? 0.3 : -0.3));
+  gctx.strokeStyle = '#aabbcc';
+  gctx.lineWidth = 2;
+  gctx.beginPath();
+  gctx.moveTo(0, 0);
+  gctx.lineTo(0, -20);
+  gctx.stroke();
+  // Sword hilt
+  gctx.strokeStyle = '#886644';
+  gctx.lineWidth = 3;
+  gctx.beginPath();
+  gctx.moveTo(-4, -2);
+  gctx.lineTo(4, -2);
+  gctx.stroke();
+  gctx.restore();
+
+  // Invulnerability flash
+  if (player.invulnTimer > 0 && Math.floor(gameTime * 10) % 2 === 0) {
+    gctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    gctx.beginPath();
+    gctx.ellipse(sx, bodyY + 3, 12, 18, 0, 0, Math.PI * 2);
+    gctx.fill();
+  }
+}
+
+function drawEnemy(enemy) {
+  const { sx, sy } = worldToScreen(enemy.x, enemy.y);
+  if (sx < -50 || sx > W + 50 || sy < -50 || sy > H + 50) return;
+
+  // Visibility check
+  const dist = Math.sqrt((enemy.x - player.x) ** 2 + (enemy.y - player.y) ** 2);
+  if (dist > VISIBILITY_RADIUS + 1) return;
+
+  const bob = Math.sin(gameTime * 3 + enemy.x) * 1.5;
+  const hitFlash = enemy.hitTimer > 0;
+
+  // Shadow
+  gctx.fillStyle = 'rgba(0,0,0,0.3)';
+  gctx.beginPath();
+  gctx.ellipse(sx, sy + 2, 10, 5, 0, 0, Math.PI * 2);
+  gctx.fill();
+
+  const bodyY = sy - 14 + bob;
+  const col = hitFlash ? '#ffffff' : enemy.color;
+  const isBoss = enemy.type === 'boss';
+  const scale = isBoss ? 1.4 : 1;
+
+  gctx.save();
+  if (isBoss) gctx.translate(sx, bodyY + 8);
+  else gctx.translate(sx, bodyY + 8);
+  gctx.scale(scale, scale);
+  gctx.translate(-sx, -(bodyY + 8));
+
+  if (enemy.type === 'skeleton') {
+    // Skeleton body
+    gctx.fillStyle = col;
+    gctx.beginPath();
+    gctx.arc(sx, bodyY - 4, 5, 0, Math.PI * 2);
+    gctx.fill();
+    // Ribs
+    gctx.strokeStyle = col;
+    gctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      gctx.beginPath();
+      gctx.moveTo(sx - 5, bodyY + 2 + i * 3);
+      gctx.lineTo(sx + 5, bodyY + 2 + i * 3);
+      gctx.stroke();
+    }
+    // Spine
+    gctx.beginPath();
+    gctx.moveTo(sx, bodyY + 1);
+    gctx.lineTo(sx, bodyY + 12);
+    gctx.stroke();
+    // Eyes
+    gctx.fillStyle = '#ff3300';
+    gctx.fillRect(sx - 3, bodyY - 6, 2, 2);
+    gctx.fillRect(sx + 1, bodyY - 6, 2, 2);
+  } else if (enemy.type === 'zombie') {
+    // Zombie body
+    gctx.fillStyle = col;
+    gctx.fillRect(sx - 6, bodyY, 12, 14);
+    // Head
+    gctx.fillStyle = hitFlash ? '#fff' : '#559955';
+    gctx.beginPath();
+    gctx.arc(sx, bodyY - 3, 6, 0, Math.PI * 2);
+    gctx.fill();
+    // Eyes
+    gctx.fillStyle = '#ffff00';
+    gctx.fillRect(sx - 3, bodyY - 5, 2, 2);
+    gctx.fillRect(sx + 1, bodyY - 5, 2, 2);
+    // Arms reaching forward
+    gctx.strokeStyle = col;
+    gctx.lineWidth = 3;
+    const armAnim = Math.sin(gameTime * 2) * 3;
+    gctx.beginPath();
+    gctx.moveTo(sx - 6, bodyY + 4);
+    gctx.lineTo(sx - 14, bodyY + armAnim);
+    gctx.stroke();
+    gctx.beginPath();
+    gctx.moveTo(sx + 6, bodyY + 4);
+    gctx.lineTo(sx + 14, bodyY - armAnim);
+    gctx.stroke();
+  } else if (enemy.type === 'demon' || enemy.type === 'boss') {
+    // Demon body
+    gctx.fillStyle = col;
+    gctx.beginPath();
+    gctx.moveTo(sx, bodyY - 8);
+    gctx.lineTo(sx + 8, bodyY + 4);
+    gctx.lineTo(sx + 5, bodyY + 14);
+    gctx.lineTo(sx - 5, bodyY + 14);
+    gctx.lineTo(sx - 8, bodyY + 4);
+    gctx.closePath();
+    gctx.fill();
+    // Horns
+    gctx.strokeStyle = hitFlash ? '#fff' : '#881111';
+    gctx.lineWidth = 2;
+    gctx.beginPath();
+    gctx.moveTo(sx - 4, bodyY - 6);
+    gctx.lineTo(sx - 8, bodyY - 14);
+    gctx.stroke();
+    gctx.beginPath();
+    gctx.moveTo(sx + 4, bodyY - 6);
+    gctx.lineTo(sx + 8, bodyY - 14);
+    gctx.stroke();
+    // Eyes
+    gctx.fillStyle = '#ffaa00';
+    gctx.beginPath();
+    gctx.arc(sx - 3, bodyY - 3, 2, 0, Math.PI * 2);
+    gctx.fill();
+    gctx.beginPath();
+    gctx.arc(sx + 3, bodyY - 3, 2, 0, Math.PI * 2);
+    gctx.fill();
+    // Wings (boss)
+    if (isBoss) {
+      gctx.fillStyle = 'rgba(150, 30, 0, 0.5)';
+      const wingAnim = Math.sin(gameTime * 3) * 5;
+      gctx.beginPath();
+      gctx.moveTo(sx - 8, bodyY);
+      gctx.lineTo(sx - 25 - wingAnim, bodyY - 10);
+      gctx.lineTo(sx - 20, bodyY + 5);
+      gctx.closePath();
+      gctx.fill();
+      gctx.beginPath();
+      gctx.moveTo(sx + 8, bodyY);
+      gctx.lineTo(sx + 25 + wingAnim, bodyY - 10);
+      gctx.lineTo(sx + 20, bodyY + 5);
+      gctx.closePath();
+      gctx.fill();
+    }
+  }
+  gctx.restore();
+
+  // Health bar
+  if (enemy.hp < enemy.maxHp) {
+    const barW = 30 * scale;
+    const barH = 3;
+    const barX = sx - barW / 2;
+    const barY = bodyY - 12 * scale;
+    gctx.fillStyle = '#333';
+    gctx.fillRect(barX, barY, barW, barH);
+    gctx.fillStyle = '#cc2222';
+    gctx.fillRect(barX, barY, barW * (enemy.hp / enemy.maxHp), barH);
+  }
+
+  // Name for boss
+  if (isBoss) {
+    gctx.fillStyle = '#ff6644';
+    gctx.font = 'bold 12px SimHei';
+    gctx.textAlign = 'center';
+    gctx.fillText(enemy.name, sx, bodyY - 22 * scale);
+  }
+}
+
+function drawItem(item) {
+  const { sx, sy } = worldToScreen(item.x, item.y);
+  if (sx < -30 || sx > W + 30 || sy < -30 || sy > H + 30) return;
+  const dist = Math.sqrt((item.x - player.x) ** 2 + (item.y - player.y) ** 2);
+  if (dist > VISIBILITY_RADIUS + 1) return;
+
+  const floatY = Math.sin(gameTime * 3 + item.x) * 3;
+
+  if (item.type === 'gold') {
+    gctx.fillStyle = '#ffcc00';
+    gctx.beginPath();
+    gctx.arc(sx, sy - 8 + floatY, 5, 0, Math.PI * 2);
+    gctx.fill();
+    gctx.fillStyle = '#aa8800';
+    gctx.font = 'bold 8px sans-serif';
+    gctx.textAlign = 'center';
+    gctx.fillText('$', sx, sy - 5 + floatY);
+  } else if (item.type === 'potion') {
+    gctx.fillStyle = '#cc2244';
+    gctx.beginPath();
+    gctx.moveTo(sx - 3, sy - 12 + floatY);
+    gctx.lineTo(sx + 3, sy - 12 + floatY);
+    gctx.lineTo(sx + 5, sy - 6 + floatY);
+    gctx.lineTo(sx + 5, sy - 2 + floatY);
+    gctx.lineTo(sx - 5, sy - 2 + floatY);
+    gctx.lineTo(sx - 5, sy - 6 + floatY);
+    gctx.closePath();
+    gctx.fill();
+    gctx.fillStyle = '#ff4466';
+    gctx.fillRect(sx - 1, sy - 10 + floatY, 2, 3);
+  }
+}
+
+function drawLightingOverlay() {
+  // Create darkness overlay
+  const lightCanvas = document.createElement('canvas');
+  lightCanvas.width = W;
+  lightCanvas.height = H;
+  const lctx = lightCanvas.getContext('2d');
+
+  // Fill with darkness
+  lctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+  lctx.fillRect(0, 0, W, H);
+
+  lctx.globalCompositeOperation = 'destination-out';
+
+  // Player torch light
+  const playerScreen = worldToScreen(player.x, player.y);
+  const pr = TORCH_RADIUS * TILE_W * 0.7;
+  const flicker = Math.sin(gameTime * 8) * 5 + Math.sin(gameTime * 13) * 3;
+  const gradient = lctx.createRadialGradient(
+    playerScreen.sx, playerScreen.sy - 10, 0,
+    playerScreen.sx, playerScreen.sy - 10, pr + flicker
+  );
+  gradient.addColorStop(0, 'rgba(0, 0, 0, 1)');
+  gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.8)');
+  gradient.addColorStop(0.8, 'rgba(0, 0, 0, 0.3)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  lctx.fillStyle = gradient;
+  lctx.fillRect(playerScreen.sx - pr - 20, playerScreen.sy - pr - 30, pr * 2 + 40, pr * 2 + 40);
+
+  // Torch lights
+  for (let ty = 0; ty < MAP_SIZE; ty++) {
+    for (let tx = 0; tx < MAP_SIZE; tx++) {
+      if (dungeon[ty][tx] === TILE_TORCH && explored[ty][tx]) {
+        const ts = worldToScreen(tx, ty);
+        if (ts.sx > -200 && ts.sx < W + 200 && ts.sy > -200 && ts.sy < H + 200) {
+          const tr = 80 + Math.sin(gameTime * 5 + tx * 3 + ty * 7) * 10;
+          const tg = lctx.createRadialGradient(ts.sx, ts.sy - 15, 0, ts.sx, ts.sy - 15, tr);
+          tg.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+          tg.addColorStop(0.6, 'rgba(0, 0, 0, 0.3)');
+          tg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          lctx.fillStyle = tg;
+          lctx.beginPath();
+          lctx.arc(ts.sx, ts.sy - 15, tr, 0, Math.PI * 2);
+          lctx.fill();
+        }
+      }
+    }
+  }
+
+  // Warm color overlay for torch effect
+  gctx.drawImage(lightCanvas, 0, 0);
+
+  // Warm light glow
+  gctx.globalCompositeOperation = 'lighter';
+  const warmGrad = gctx.createRadialGradient(
+    playerScreen.sx, playerScreen.sy - 10, 0,
+    playerScreen.sx, playerScreen.sy - 10, pr * 0.6 + flicker
+  );
+  warmGrad.addColorStop(0, 'rgba(60, 35, 10, 0.15)');
+  warmGrad.addColorStop(0.5, 'rgba(40, 20, 5, 0.08)');
+  warmGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  gctx.fillStyle = warmGrad;
+  gctx.beginPath();
+  gctx.arc(playerScreen.sx, playerScreen.sy - 10, pr + 20, 0, Math.PI * 2);
+  gctx.fill();
+  gctx.globalCompositeOperation = 'source-over';
+}
+
+function drawFloatingTexts() {
+  for (const ft of floatingTexts) {
+    gctx.font = `bold ${ft.size || 14}px SimHei`;
+    gctx.textAlign = 'center';
+    gctx.fillStyle = ft.color;
+    gctx.globalAlpha = ft.alpha;
+    gctx.fillText(ft.text, ft.sx, ft.sy);
+    gctx.globalAlpha = 1;
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    gctx.fillStyle = p.color;
+    gctx.globalAlpha = p.alpha;
+    gctx.fillRect(p.sx - p.size / 2, p.sy - p.size / 2, p.size, p.size);
+    gctx.globalAlpha = 1;
+  }
+}
+
+function drawMinimap() {
+  if (!showMinimap) return;
+  const mmSize = 200;
+  const mmX = W - mmSize - 20;
+  const mmY = 80;
+  const cellSize = mmSize / MAP_SIZE;
+
+  uctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  uctx.fillRect(mmX - 2, mmY - 2, mmSize + 4, mmSize + 4);
+  uctx.strokeStyle = '#554433';
+  uctx.lineWidth = 2;
+  uctx.strokeRect(mmX - 2, mmY - 2, mmSize + 4, mmSize + 4);
+
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      if (!explored[y][x]) continue;
+      const tile = dungeon[y][x];
+      if (tile === TILE_WALL) uctx.fillStyle = '#221f1a';
+      else if (tile === TILE_STAIRS) uctx.fillStyle = '#4444aa';
+      else if (tile === TILE_TORCH) uctx.fillStyle = '#553300';
+      else uctx.fillStyle = '#3a3530';
+      uctx.fillRect(mmX + x * cellSize, mmY + y * cellSize, cellSize + 0.5, cellSize + 0.5);
+    }
+  }
+
+  // Enemies on minimap
+  for (const e of enemies) {
+    if (explored[Math.floor(e.y)] && explored[Math.floor(e.y)][Math.floor(e.x)]) {
+      uctx.fillStyle = '#ff3333';
+      uctx.fillRect(mmX + e.x * cellSize - 1, mmY + e.y * cellSize - 1, 3, 3);
+    }
+  }
+
+  // Player on minimap
+  uctx.fillStyle = '#44ff44';
+  uctx.fillRect(mmX + player.x * cellSize - 2, mmY + player.y * cellSize - 2, 4, 4);
+
+  uctx.fillStyle = '#887766';
+  uctx.font = '12px SimHei';
+  uctx.textAlign = 'center';
+  uctx.fillText('小地图 (Tab 切换)', mmX + mmSize / 2, mmY - 6);
+}
+
+function drawHUD() {
+  uctx.clearRect(0, 0, W, H);
+
+  // Left panel - HP & MP orbs
+  const orbX = 70;
+  const orbY = H - 60;
+  const orbR = 35;
+
+  // HP Orb
+  uctx.fillStyle = '#111';
+  uctx.beginPath();
+  uctx.arc(orbX, orbY, orbR, 0, Math.PI * 2);
+  uctx.fill();
+  // HP fill
+  const hpPercent = player.hp / player.maxHp;
+  uctx.save();
+  uctx.beginPath();
+  uctx.arc(orbX, orbY, orbR - 2, 0, Math.PI * 2);
+  uctx.clip();
+  uctx.fillStyle = '#881111';
+  uctx.fillRect(orbX - orbR, orbY + orbR - orbR * 2 * hpPercent, orbR * 2, orbR * 2 * hpPercent);
+  uctx.restore();
+  uctx.strokeStyle = '#553333';
+  uctx.lineWidth = 3;
+  uctx.beginPath();
+  uctx.arc(orbX, orbY, orbR, 0, Math.PI * 2);
+  uctx.stroke();
+  uctx.fillStyle = '#ff6644';
+  uctx.font = 'bold 14px SimHei';
+  uctx.textAlign = 'center';
+  uctx.fillText(`${player.hp}/${player.maxHp}`, orbX, orbY + 5);
+
+  // MP Orb
+  const mpOrbX = W - 70;
+  uctx.fillStyle = '#111';
+  uctx.beginPath();
+  uctx.arc(mpOrbX, orbY, orbR, 0, Math.PI * 2);
+  uctx.fill();
+  const mpPercent = player.mp / player.maxMp;
+  uctx.save();
+  uctx.beginPath();
+  uctx.arc(mpOrbX, orbY, orbR - 2, 0, Math.PI * 2);
+  uctx.clip();
+  uctx.fillStyle = '#112288';
+  uctx.fillRect(mpOrbX - orbR, orbY + orbR - orbR * 2 * mpPercent, orbR * 2, orbR * 2 * mpPercent);
+  uctx.restore();
+  uctx.strokeStyle = '#333366';
+  uctx.lineWidth = 3;
+  uctx.beginPath();
+  uctx.arc(mpOrbX, orbY, orbR, 0, Math.PI * 2);
+  uctx.stroke();
+  uctx.fillStyle = '#6688ff';
+  uctx.font = 'bold 14px SimHei';
+  uctx.textAlign = 'center';
+  uctx.fillText(`${player.mp}/${player.maxMp}`, mpOrbX, orbY + 5);
+
+  // XP Bar
+  const xpBarW = W * 0.4;
+  const xpBarH = 12;
+  const xpBarX = W / 2 - xpBarW / 2;
+  const xpBarY = H - 25;
+  uctx.fillStyle = 'rgba(0,0,0,0.7)';
+  uctx.fillRect(xpBarX, xpBarY, xpBarW, xpBarH);
+  uctx.fillStyle = '#886622';
+  uctx.fillRect(xpBarX, xpBarY, xpBarW * (player.xp / player.xpToNext), xpBarH);
+  uctx.strokeStyle = '#554422';
+  uctx.lineWidth = 1;
+  uctx.strokeRect(xpBarX, xpBarY, xpBarW, xpBarH);
+  uctx.fillStyle = '#ccaa66';
+  uctx.font = '10px SimHei';
+  uctx.textAlign = 'center';
+  uctx.fillText(`经验 ${player.xp}/${player.xpToNext}`, W / 2, xpBarY + 10);
+
+  // Top bar info
+  uctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  uctx.fillRect(0, 0, W, 40);
+
+  uctx.font = 'bold 16px SimHei';
+  uctx.textAlign = 'left';
+  uctx.fillStyle = '#ccaa77';
+  uctx.fillText(`等级 ${player.level}`, 20, 26);
+  uctx.fillStyle = '#ffcc44';
+  uctx.fillText(`金币 ${player.gold}`, 130, 26);
+  uctx.fillStyle = '#cc4466';
+  uctx.fillText(`药水 ${player.potions} [1]`, 260, 26);
+  uctx.fillStyle = '#8888cc';
+  uctx.fillText(`地下城 第${currentFloor}层`, 420, 26);
+  uctx.fillStyle = '#777';
+  uctx.fillText(`攻击:${player.attack} 防御:${player.defense}`, 600, 26);
+
+  // Bottom bar
+  uctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+  uctx.fillRect(orbX + orbR + 10, H - 45, W - (orbX + orbR + 10) * 2, 30);
+
+  // Potion slot
+  const slotX = orbX + orbR + 30;
+  const slotY = H - 42;
+  uctx.strokeStyle = '#554433';
+  uctx.lineWidth = 2;
+  uctx.strokeRect(slotX, slotY, 24, 24);
+  if (player.potions > 0) {
+    uctx.fillStyle = '#cc2244';
+    uctx.beginPath();
+    uctx.moveTo(slotX + 9, slotY + 4);
+    uctx.lineTo(slotX + 15, slotY + 4);
+    uctx.lineTo(slotX + 17, slotY + 10);
+    uctx.lineTo(slotX + 17, slotY + 18);
+    uctx.lineTo(slotX + 7, slotY + 18);
+    uctx.lineTo(slotX + 7, slotY + 10);
+    uctx.closePath();
+    uctx.fill();
+  }
+  uctx.fillStyle = '#888';
+  uctx.font = '10px SimHei';
+  uctx.textAlign = 'center';
+  uctx.fillText('1', slotX + 12, slotY + 34);
+
+  // Tooltip for hovered enemy
+  const worldPos = screenToWorld(mouseScreenX, mouseScreenY);
+  for (const e of enemies) {
+    const dx = worldPos.x - e.x;
+    const dy = worldPos.y - e.y;
+    if (dx * dx + dy * dy < 0.8) {
+      const es = worldToScreen(e.x, e.y);
+      uctx.fillStyle = 'rgba(0,0,0,0.8)';
+      uctx.fillRect(es.sx - 60, es.sy - 55, 120, 22);
+      uctx.fillStyle = '#ff8866';
+      uctx.font = '12px SimHei';
+      uctx.textAlign = 'center';
+      uctx.fillText(`${e.name} Lv${currentFloor} HP:${e.hp}/${e.maxHp}`, es.sx, es.sy - 40);
+      break;
+    }
+  }
+
+  // Controls hint
+  uctx.fillStyle = 'rgba(255,255,255,0.3)';
+  uctx.font = '11px SimHei';
+  uctx.textAlign = 'right';
+  uctx.fillText('点击移动/攻击 | 1:使用药水 | Tab:地图', W - 20, H - 50);
+
+  drawMinimap();
+}
+
+// ==================== GAME LOGIC ====================
+function updateExplored() {
+  const px = Math.round(player.x);
+  const py = Math.round(player.y);
+  for (let dy = -VISIBILITY_RADIUS; dy <= VISIBILITY_RADIUS; dy++) {
+    for (let dx = -VISIBILITY_RADIUS; dx <= VISIBILITY_RADIUS; dx++) {
+      const tx = px + dx, ty = py + dy;
+      if (tx < 0 || tx >= MAP_SIZE || ty < 0 || ty >= MAP_SIZE) continue;
+      if (dx * dx + dy * dy <= VISIBILITY_RADIUS * VISIBILITY_RADIUS) {
+        explored[ty][tx] = true;
+      }
+    }
+  }
+}
+
+function moveAlongPath(entity, dt) {
+  if (!entity.path || entity.path.length === 0) return false;
+
+  const target = entity.path[0];
+  const dx = target.x - entity.x;
+  const dy = target.y - entity.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  if (dist < 0.1) {
+    entity.x = target.x;
+    entity.y = target.y;
+    entity.path.shift();
+    return entity.path.length > 0;
+  }
+
+  const speed = entity.speed * dt * 60;
+  entity.x += (dx / dist) * Math.min(speed, dist);
+  entity.y += (dy / dist) * Math.min(speed, dist);
+
+  if (dx > 0.1) entity.facingRight = true;
+  else if (dx < -0.1) entity.facingRight = false;
+
+  return true;
+}
+
+function updatePlayer(dt) {
+  // Attack cooldown
+  if (player.attackCooldown > 0) player.attackCooldown -= dt;
+  if (player.invulnTimer > 0) player.invulnTimer -= dt;
+
+  // Swing animation
+  if (player.swingAngle !== 0) {
+    player.swingAngle *= 0.85;
+    if (Math.abs(player.swingAngle) < 0.05) player.swingAngle = 0;
+  }
+
+  // Attack target
+  if (player.attackTarget) {
+    const target = player.attackTarget;
+    const dx = target.x - player.x;
+    const dy = target.y - player.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist <= player.attackRange) {
+      player.path = [];
+      if (player.attackCooldown <= 0) {
+        attackEnemy(target);
+        player.attackCooldown = 0.5;
+      }
+      player.facingRight = dx > 0;
+    } else {
+      // Move toward target
+      const path = findPath(Math.round(player.x), Math.round(player.y),
+                            Math.round(target.x), Math.round(target.y));
+      if (path.length > 1) {
+        player.path = path.slice(1);
+      }
+    }
+
+    // Check if target is dead
+    if (target.hp <= 0) {
+      player.attackTarget = null;
+    }
+  }
+
+  moveAlongPath(player, dt);
+
+  // Mana regen
+  if (player.mp < player.maxMp) {
+    player.mp = Math.min(player.maxMp, player.mp + 0.5 * dt);
+  }
+
+  // Check stairs
+  const px = Math.round(player.x), py = Math.round(player.y);
+  if (px >= 0 && px < MAP_SIZE && py >= 0 && py < MAP_SIZE) {
+    if (dungeon[py][px] === TILE_STAIRS) {
+      goToNextFloor();
+    }
+  }
+
+  // Pick up items
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    const dx = item.x - player.x;
+    const dy = item.y - player.y;
+    if (dx * dx + dy * dy < 0.8) {
+      if (item.type === 'gold') {
+        player.gold += item.amount;
+        spawnFloatingText(item.x, item.y, `+${item.amount}金币`, '#ffcc00');
+      } else if (item.type === 'potion') {
+        player.potions++;
+        spawnFloatingText(item.x, item.y, '+1药水', '#ff4466');
+      }
+      items.splice(i, 1);
+    }
+  }
+
+  // Update camera
+  const playerIso = toIso(player.x, player.y);
+  camera.x += (playerIso.sx - camera.x) * 0.1;
+  camera.y += (playerIso.sy - camera.y) * 0.1;
+}
+
+function attackEnemy(enemy) {
+  const dmg = Math.max(1, player.attack - enemy.defense + Math.floor(Math.random() * 4) - 2);
+  enemy.hp -= dmg;
+  enemy.hitTimer = 0.15;
+  enemy.state = 'chase';
+
+  player.swingAngle = player.facingRight ? -1.2 : 1.2;
+
+  // Floating damage
+  spawnFloatingText(enemy.x, enemy.y, `-${dmg}`, '#ff4444', 16);
+
+  // Blood particles
+  const es = worldToScreen(enemy.x, enemy.y);
+  for (let i = 0; i < 5; i++) {
+    particles.push({
+      sx: es.sx, sy: es.sy - 15,
+      vx: (Math.random() - 0.5) * 80,
+      vy: -Math.random() * 60,
+      size: 2 + Math.random() * 2,
+      color: `hsl(0, ${60 + Math.random() * 40}%, ${30 + Math.random() * 20}%)`,
+      alpha: 1, life: 0.5 + Math.random() * 0.3
+    });
+  }
+
+  if (enemy.hp <= 0) {
+    killEnemy(enemy);
+  }
+}
+
+function killEnemy(enemy) {
+  // XP
+  player.xp += enemy.xp;
+  spawnFloatingText(enemy.x, enemy.y - 0.5, `+${enemy.xp}XP`, '#ccaa66', 12);
+
+  // Check level up
+  while (player.xp >= player.xpToNext) {
+    player.xp -= player.xpToNext;
+    player.level++;
+    player.maxHp += 15;
+    player.hp = player.maxHp;
+    player.maxMp += 8;
+    player.mp = player.maxMp;
+    player.attack += 3;
+    player.defense += 1;
+    player.xpToNext = Math.floor(player.xpToNext * 1.5);
+    showLevelUp();
+  }
+
+  // Drop items
+  const goldAmt = enemy.goldDrop[0] + Math.floor(Math.random() * (enemy.goldDrop[1] - enemy.goldDrop[0]));
+  items.push({ type: 'gold', x: enemy.x + (Math.random() - 0.5) * 0.5, y: enemy.y + (Math.random() - 0.5) * 0.5, amount: goldAmt });
+
+  if (Math.random() < enemy.potionChance) {
+    items.push({ type: 'potion', x: enemy.x + (Math.random() - 0.5) * 0.5, y: enemy.y + (Math.random() - 0.5) * 0.5 });
+  }
+
+  // Death particles
+  const es = worldToScreen(enemy.x, enemy.y);
+  for (let i = 0; i < 15; i++) {
+    particles.push({
+      sx: es.sx, sy: es.sy - 10,
+      vx: (Math.random() - 0.5) * 100,
+      vy: -Math.random() * 80 - 20,
+      size: 2 + Math.random() * 3,
+      color: enemy.color,
+      alpha: 1, life: 0.8 + Math.random() * 0.5
+    });
+  }
+
+  // Remove enemy
+  const idx = enemies.indexOf(enemy);
+  if (idx !== -1) enemies.splice(idx, 1);
+
+  if (player.attackTarget === enemy) player.attackTarget = null;
+}
+
+function updateEnemies(dt) {
+  for (const e of enemies) {
+    if (e.hitTimer > 0) e.hitTimer -= dt;
+    if (e.attackCooldown > 0) e.attackCooldown -= dt;
+    e.animTimer += dt;
+
+    const dx = player.x - e.x;
+    const dy = player.y - e.y;
+    const distToPlayer = Math.sqrt(dx * dx + dy * dy);
+
+    // State machine
+    switch (e.state) {
+      case 'patrol': {
+        if (distToPlayer < 5) {
+          e.state = 'chase';
+          break;
+        }
+        if (!e.patrolTarget || (Math.abs(e.x - e.patrolTarget.x) < 0.3 && Math.abs(e.y - e.patrolTarget.y) < 0.3)) {
+          const nx = e.homeX + (Math.random() - 0.5) * 6;
+          const ny = e.homeY + (Math.random() - 0.5) * 6;
+          const rnx = Math.round(nx), rny = Math.round(ny);
+          if (rnx >= 0 && rnx < MAP_SIZE && rny >= 0 && rny < MAP_SIZE && dungeon[rny][rnx] !== TILE_WALL) {
+            e.patrolTarget = { x: nx, y: ny };
+          }
+        }
+        if (e.patrolTarget) {
+          const pdx = e.patrolTarget.x - e.x;
+          const pdy = e.patrolTarget.y - e.y;
+          const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+          if (pdist > 0.1) {
+            const speed = e.speed * 0.5 * dt * 60;
+            e.x += (pdx / pdist) * Math.min(speed, pdist);
+            e.y += (pdy / pdist) * Math.min(speed, pdist);
+            e.facingRight = pdx > 0;
+          }
+        }
+        break;
+      }
+      case 'chase': {
+        if (distToPlayer > 10) {
+          e.state = 'patrol';
+          break;
+        }
+        if (distToPlayer <= 1.3) {
+          e.state = 'attack';
+          break;
+        }
+        // Chase player
+        const speed = e.speed * dt * 60;
+        if (distToPlayer > 0.1) {
+          e.x += (dx / distToPlayer) * Math.min(speed, distToPlayer);
+          e.y += (dy / distToPlayer) * Math.min(speed, distToPlayer);
+          e.facingRight = dx > 0;
+        }
+        break;
+      }
+      case 'attack': {
+        if (distToPlayer > 1.5) {
+          e.state = 'chase';
+          break;
+        }
+        if (e.attackCooldown <= 0) {
+          // Attack player
+          const dmg = Math.max(1, e.attack - player.defense + Math.floor(Math.random() * 3) - 1);
+          if (player.invulnTimer <= 0) {
+            player.hp -= dmg;
+            player.invulnTimer = 0.3;
+            spawnFloatingText(player.x, player.y, `-${dmg}`, '#ff2222', 16);
+
+            // Hit particles
+            const ps = worldToScreen(player.x, player.y);
+            for (let i = 0; i < 3; i++) {
+              particles.push({
+                sx: ps.sx, sy: ps.sy - 15,
+                vx: (Math.random() - 0.5) * 50,
+                vy: -Math.random() * 40,
+                size: 2, color: '#ff3333',
+                alpha: 1, life: 0.3
+              });
+            }
+
+            if (player.hp <= 0) {
+              playerDied();
+            }
+          }
+          e.attackCooldown = 0.8;
+        }
+        e.facingRight = dx > 0;
+        break;
+      }
+    }
+
+    // Keep in bounds
+    e.x = Math.max(1, Math.min(MAP_SIZE - 2, e.x));
+    e.y = Math.max(1, Math.min(MAP_SIZE - 2, e.y));
+  }
+}
+
+function updateFloatingTexts(dt) {
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.sy -= 30 * dt;
+    ft.alpha -= dt * 1.2;
+    if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.sx += p.vx * dt;
+    p.sy += p.vy * dt;
+    p.vy += 150 * dt; // gravity
+    p.life -= dt;
+    p.alpha = Math.max(0, p.life);
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function spawnFloatingText(wx, wy, text, color, size) {
+  const { sx, sy } = worldToScreen(wx, wy);
+  floatingTexts.push({
+    sx: sx + (Math.random() - 0.5) * 20,
+    sy: sy - 20,
+    text, color,
+    size: size || 14,
+    alpha: 1
+  });
+}
+
+function showLevelUp() {
+  const el = document.getElementById('levelUpMsg');
+  el.style.display = 'block';
+  el.textContent = `等级提升! Lv.${player.level}`;
+  setTimeout(() => { el.style.display = 'none'; }, 2000);
+
+  // Level up particles
+  const ps = worldToScreen(player.x, player.y);
+  for (let i = 0; i < 30; i++) {
+    const angle = (Math.PI * 2 * i) / 30;
+    particles.push({
+      sx: ps.sx, sy: ps.sy - 10,
+      vx: Math.cos(angle) * 80,
+      vy: Math.sin(angle) * 80 - 40,
+      size: 3, color: '#ffdd44',
+      alpha: 1, life: 1
+    });
+  }
+}
+
+function goToNextFloor() {
+  currentFloor++;
+  const { startX, startY } = generateDungeon();
+  player.x = startX;
+  player.y = startY;
+  player.targetX = startX;
+  player.targetY = startY;
+  player.path = [];
+  player.attackTarget = null;
+  floatingTexts = [];
+  particles = [];
+
+  const el = document.getElementById('floorMsg');
+  el.textContent = `地下城 第${currentFloor}层`;
+  el.style.display = 'block';
+  setTimeout(() => { el.style.display = 'none'; }, 2000);
+
+  // Heal a bit on floor change
+  player.hp = Math.min(player.maxHp, player.hp + Math.floor(player.maxHp * 0.3));
+  player.mp = Math.min(player.maxMp, player.mp + Math.floor(player.maxMp * 0.3));
+}
+
+function playerDied() {
+  gameRunning = false;
+  const el = document.getElementById('deathScreen');
+  el.style.display = 'flex';
+  document.getElementById('deathInfo').textContent =
+    `你在第${currentFloor}层倒下了 | 等级${player.level} | 金币${player.gold}`;
+}
+
+function usePotion() {
+  if (player.potions > 0 && player.hp < player.maxHp) {
+    player.potions--;
+    const heal = Math.floor(player.maxHp * 0.4);
+    player.hp = Math.min(player.maxHp, player.hp + heal);
+    spawnFloatingText(player.x, player.y, `+${heal}HP`, '#44ff44', 16);
+
+    // Heal particles
+    const ps = worldToScreen(player.x, player.y);
+    for (let i = 0; i < 10; i++) {
+      particles.push({
+        sx: ps.sx + (Math.random() - 0.5) * 20,
+        sy: ps.sy,
+        vx: (Math.random() - 0.5) * 20,
+        vy: -Math.random() * 60 - 20,
+        size: 3, color: '#44ff44',
+        alpha: 1, life: 0.8
+      });
+    }
+  }
+}
+
+// ==================== INPUT ====================
+gameCanvas.addEventListener('click', (e) => {
+  if (!gameRunning) return;
+
+  mouseScreenX = e.clientX;
+  mouseScreenY = e.clientY;
+
+  const world = screenToWorld(e.clientX, e.clientY);
+  const wx = Math.round(world.x);
+  const wy = Math.round(world.y);
+
+  // Check if clicking on an enemy
+  let clickedEnemy = null;
+  for (const enemy of enemies) {
+    const dx = world.x - enemy.x;
+    const dy = world.y - enemy.y;
+    if (dx * dx + dy * dy < 1) {
+      clickedEnemy = enemy;
+      break;
+    }
+  }
+
+  if (clickedEnemy) {
+    player.attackTarget = clickedEnemy;
+    player.path = [];
+  } else {
+    player.attackTarget = null;
+    if (wx >= 0 && wx < MAP_SIZE && wy >= 0 && wy < MAP_SIZE && dungeon[wy][wx] !== TILE_WALL) {
+      const path = findPath(Math.round(player.x), Math.round(player.y), wx, wy);
+      if (path.length > 1) {
+        player.path = path.slice(1);
+      }
+    }
+  }
+});
+
+gameCanvas.addEventListener('mousemove', (e) => {
+  mouseScreenX = e.clientX;
+  mouseScreenY = e.clientY;
+
+  if (!gameRunning) return;
+  // Check cursor style
+  const world = screenToWorld(e.clientX, e.clientY);
+  let onEnemy = false;
+  for (const enemy of enemies) {
+    const dx = world.x - enemy.x;
+    const dy = world.y - enemy.y;
+    if (dx * dx + dy * dy < 1) {
+      onEnemy = true;
+      break;
+    }
+  }
+  gameCanvas.style.cursor = onEnemy ? 'crosshair' : 'pointer';
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!gameRunning) return;
+  if (e.key === '1') {
+    usePotion();
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    showMinimap = !showMinimap;
+  }
+});
+
+// ==================== MAIN LOOP ====================
+let lastTime = 0;
+
+function gameLoop(time) {
+  const dt = Math.min((time - lastTime) / 1000, 0.05);
+  lastTime = time;
+  gameTime += dt;
+
+  if (gameRunning) {
+    updatePlayer(dt);
+    updateEnemies(dt);
+    updateExplored();
+    updateFloatingTexts(dt);
+    updateParticles(dt);
+
+    // ---- RENDER ----
+    gctx.fillStyle = '#000';
+    gctx.fillRect(0, 0, W, H);
+
+    // Determine visible tile range
+    const topLeft = screenToWorld(0, 0);
+    const topRight = screenToWorld(W, 0);
+    const bottomLeft = screenToWorld(0, H);
+    const bottomRight = screenToWorld(W, H);
+
+    const minTX = Math.max(0, Math.floor(Math.min(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x)) - 2);
+    const maxTX = Math.min(MAP_SIZE - 1, Math.ceil(Math.max(topLeft.x, topRight.x, bottomLeft.x, bottomRight.x)) + 2);
+    const minTY = Math.max(0, Math.floor(Math.min(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)) - 2);
+    const maxTY = Math.min(MAP_SIZE - 1, Math.ceil(Math.max(topLeft.y, topRight.y, bottomLeft.y, bottomRight.y)) + 2);
+
+    // Draw tiles (isometric order)
+    for (let ty = minTY; ty <= maxTY; ty++) {
+      for (let tx = minTX; tx <= maxTX; tx++) {
+        if (explored[ty] && explored[ty][tx]) {
+          drawTile(tx, ty);
+        }
+      }
+    }
+
+    // Draw items
+    for (const item of items) {
+      drawItem(item);
+    }
+
+    // Draw entities sorted by Y (painter's algorithm)
+    const entities = [];
+    entities.push({ type: 'player', y: player.y });
+    for (const e of enemies) {
+      const dist = Math.sqrt((e.x - player.x) ** 2 + (e.y - player.y) ** 2);
+      if (dist <= VISIBILITY_RADIUS + 1) {
+        entities.push({ type: 'enemy', ref: e, y: e.y });
+      }
+    }
+    entities.sort((a, b) => a.y - b.y);
+
+    for (const ent of entities) {
+      if (ent.type === 'player') drawPlayer();
+      else drawEnemy(ent.ref);
+    }
+
+    // Lighting overlay
+    drawLightingOverlay();
+
+    // Post-lighting effects
+    drawFloatingTexts();
+    drawParticles();
+
+    // UI
+    drawHUD();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ==================== START ====================
+function startGame() {
+  document.getElementById('titleScreen').style.display = 'none';
+  document.getElementById('deathScreen').style.display = 'none';
+
+  currentFloor = 1;
+  floatingTexts = [];
+  particles = [];
+  items = [];
+
+  const { startX, startY } = generateDungeon();
+  player = createPlayer(startX, startY);
+
+  const playerIso = toIso(player.x, player.y);
+  camera.x = playerIso.sx;
+  camera.y = playerIso.sy;
+
+  gameRunning = true;
+}
+
+function restartGame() {
+  startGame();
+}
+
+// Boot
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>

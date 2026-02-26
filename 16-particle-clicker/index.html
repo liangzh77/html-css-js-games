@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>粒子点击器</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-dark: #0a0e1a;
+  --bg-panel: #111827;
+  --bg-card: #1e293b;
+  --bg-hover: #263044;
+  --border: #334155;
+  --accent: #3b82f6;
+  --accent-glow: #60a5fa;
+  --accent-dim: #1e3a5f;
+  --green: #22c55e;
+  --yellow: #eab308;
+  --purple: #a855f7;
+  --red: #ef4444;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --text-bright: #f8fafc;
+}
+
+body {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-dark);
+  color: var(--text);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Header */
+#header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+#header h1 {
+  font-size: 22px;
+  background: linear-gradient(90deg, var(--accent-glow), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 2px;
+}
+
+#header-resources {
+  display: flex;
+  gap: 28px;
+  font-size: 14px;
+}
+
+.resource-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resource-display .icon { font-size: 18px; }
+.resource-display .label { color: var(--text-dim); }
+.resource-display .value { font-weight: 700; font-size: 15px; }
+.resource-display .rate { color: var(--text-dim); font-size: 12px; }
+
+.res-data .value { color: var(--accent-glow); }
+.res-funding .value { color: var(--green); }
+.res-reputation .value { color: var(--yellow); }
+
+#save-indicator {
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: opacity 0.3s;
+}
+
+/* Main Layout */
+#game-container {
+  display: grid;
+  grid-template-columns: 300px 1fr 320px;
+  gap: 0;
+  min-height: calc(100vh - 52px);
+}
+
+/* Left Panel - Upgrades */
+#left-panel {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: calc(100vh - 52px);
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding: 14px 16px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.upgrade-card {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(51,65,85,0.5);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.upgrade-card:hover { background: var(--bg-hover); }
+
+.upgrade-card.locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.upgrade-card.affordable { border-left: 3px solid var(--accent); }
+.upgrade-card:not(.affordable) { border-left: 3px solid transparent; }
+
+.upgrade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.upgrade-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upgrade-count {
+  background: var(--accent-dim);
+  color: var(--accent-glow);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.upgrade-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.upgrade-cost {
+  font-size: 12px;
+  color: var(--accent-glow);
+  font-weight: 600;
+}
+
+.upgrade-effect {
+  font-size: 11px;
+  color: var(--green);
+}
+
+/* Center Panel */
+#center-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: calc(100vh - 52px);
+}
+
+/* Collision Canvas */
+#collision-area {
+  position: relative;
+  width: 100%;
+  height: 340px;
+  background: radial-gradient(ellipse at center, #0c1929 0%, #060a14 100%);
+  border-bottom: 1px solid var(--border);
+  cursor: crosshair;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#collision-canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#click-prompt {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--text-dim);
+  pointer-events: none;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+#data-per-click-display {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+/* Floating numbers */
+.float-number {
+  position: absolute;
+  pointer-events: none;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent-glow);
+  text-shadow: 0 0 8px rgba(96,165,250,0.6);
+  animation: floatUp 1s ease-out forwards;
+  z-index: 10;
+}
+
+@keyframes floatUp {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-60px) scale(0.7); }
+}
+
+/* Tabs area below canvas */
+#tabs-bar {
+  display: flex;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab-btn:hover { color: var(--text); background: rgba(59,130,246,0.05); }
+.tab-btn.active {
+  color: var(--accent-glow);
+  border-bottom-color: var(--accent);
+}
+
+#tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--bg-dark);
+}
+
+/* Research Tab */
+.discovery-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.3s;
+}
+
+.discovery-card.completed {
+  border-color: var(--green);
+  background: rgba(34,197,94,0.05);
+}
+
+.discovery-card.active {
+  border-color: var(--accent);
+}
+
+.discovery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.discovery-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.discovery-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.discovery-status.pending {
+  background: var(--accent-dim);
+  color: var(--accent-glow);
+}
+
+.discovery-status.done {
+  background: rgba(34,197,94,0.2);
+  color: var(--green);
+}
+
+.discovery-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(51,65,85,0.6);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.discovery-card.completed .progress-bar-fill {
+  background: var(--green);
+}
+
+.discovery-progress-text {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.discovery-reward {
+  font-size: 11px;
+  color: var(--yellow);
+  margin-top: 4px;
+}
+
+/* Publications Tab */
+#publications-tab { display: flex; flex-direction: column; gap: 10px; }
+
+.pub-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pub-info { flex: 1; }
+.pub-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+.pub-desc { font-size: 11px; color: var(--text-dim); }
+.pub-stats { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+.pub-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.pub-btn:hover { filter: brightness(1.15); transform: scale(1.02); }
+.pub-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+}
+
+/* Right Panel - Stats & Log */
+#right-panel {
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  max-height: calc(100vh - 52px);
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-section h3 {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 3px 0;
+}
+
+.stat-label { color: var(--text-dim); }
+.stat-value { font-weight: 600; }
+
+/* Event Log */
+#event-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 12px;
+}
+
+.log-entry {
+  font-size: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(51,65,85,0.3);
+  color: var(--text-dim);
+  animation: fadeIn 0.3s;
+}
+
+.log-entry .log-time {
+  color: var(--text-dim);
+  font-size: 10px;
+  margin-right: 6px;
+}
+
+.log-entry.log-discovery { color: var(--yellow); }
+.log-entry.log-publish { color: var(--green); }
+.log-entry.log-upgrade { color: var(--accent-glow); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Buttons */
+#bottom-buttons {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+
+.small-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.small-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+/* Responsive */
+@media (max-width: 1024px) {
+  #game-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+  #left-panel, #right-panel {
+    max-height: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+  }
+  #center-panel { max-height: none; }
+  #collision-area { height: 260px; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* Achievement popup */
+.achievement-popup {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  border: 1px solid var(--purple);
+  border-radius: 10px;
+  padding: 14px 28px;
+  z-index: 1000;
+  text-align: center;
+  animation: achieveIn 0.4s ease-out, achieveOut 0.4s ease-in 2.6s forwards;
+  box-shadow: 0 0 30px rgba(168,85,247,0.3);
+}
+
+.achievement-popup .ach-title {
+  font-size: 11px;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.achievement-popup .ach-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+@keyframes achieveIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes achieveOut {
+  from { opacity: 1; }
+  to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <h1>粒子点击器</h1>
+  <div id="header-resources">
+    <div class="resource-display res-data">
+      <span class="icon">&#9883;</span>
+      <span class="label">数据:</span>
+      <span class="value" id="res-data">0</span>
+      <span class="rate" id="res-data-rate">(+0/秒)</span>
+    </div>
+    <div class="resource-display res-funding">
+      <span class="icon">&#9830;</span>
+      <span class="label">经费:</span>
+      <span class="value" id="res-funding">0</span>
+    </div>
+    <div class="resource-display res-reputation">
+      <span class="icon">&#9733;</span>
+      <span class="label">声望:</span>
+      <span class="value" id="res-reputation">0</span>
+    </div>
+  </div>
+  <span id="save-indicator"></span>
+</div>
+
+<!-- Main Game -->
+<div id="game-container">
+
+  <!-- Left Panel: Upgrades -->
+  <div id="left-panel">
+    <div class="panel-title">升级 / 雇佣</div>
+    <div id="upgrades-list"></div>
+  </div>
+
+  <!-- Center Panel -->
+  <div id="center-panel">
+    <div id="collision-area" onclick="handleClick(event)">
+      <canvas id="collision-canvas"></canvas>
+      <div id="data-per-click-display">每次点击: <span id="dpc-val">1</span> 数据</div>
+      <div id="click-prompt">点击粒子碰撞区域产生数据</div>
+    </div>
+
+    <div id="tabs-bar">
+      <button class="tab-btn active" data-tab="research">研究发现</button>
+      <button class="tab-btn" data-tab="publications">发表论文</button>
+      <button class="tab-btn" data-tab="stats">统计数据</button>
+    </div>
+
+    <div id="tab-content">
+      <div id="research-tab" class="tab-panel"></div>
+      <div id="publications-tab" class="tab-panel" style="display:none;"></div>
+      <div id="stats-tab" class="tab-panel" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- Right Panel: Stats & Log -->
+  <div id="right-panel">
+    <div class="stats-section">
+      <h3>生产概览</h3>
+      <div class="stat-row">
+        <span class="stat-label">每秒数据</span>
+        <span class="stat-value" id="stat-dps">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">每次点击</span>
+        <span class="stat-value" id="stat-dpc">1</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">点击倍率</span>
+        <span class="stat-value" id="stat-mult">x1.0</span>
+      </div>
+    </div>
+    <div class="stats-section">
+      <h3>人员编制</h3>
+      <div id="staff-summary"></div>
+    </div>
+    <div class="panel-title">事件日志</div>
+    <div id="event-log"></div>
+    <div id="bottom-buttons">
+      <button class="small-btn" onclick="saveGame()">手动保存</button>
+      <button class="small-btn" onclick="resetGame()">重置游戏</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// GAME STATE
+// ============================================================
+let state = {
+  data: 0,
+  totalData: 0,
+  funding: 0,
+  totalFunding: 0,
+  reputation: 0,
+  totalReputation: 0,
+  clicks: 0,
+  dataPerClick: 1,
+  clickMultiplier: 1,
+  dataPerSecond: 0,
+  upgrades: {},
+  discoveries: {},
+  publications: {},
+  startTime: Date.now(),
+  lastSave: Date.now(),
+  lastTick: Date.now(),
+  totalPapers: 0,
+};
+
+// ============================================================
+// DATA: UPGRADES
+// ============================================================
+const UPGRADES = [
+  {
+    id: 'phd', name: '博士研究生', desc: '自动产生少量数据',
+    baseCost: 10, costMult: 1.15, dps: 0.5, category: 'staff',
+    icon: '&#128104;&#8205;&#127891;',
+  },
+  {
+    id: 'postdoc', name: '博士后研究员', desc: '更快地产生数据',
+    baseCost: 100, costMult: 1.15, dps: 4, category: 'staff',
+    icon: '&#128105;&#8205;&#128300;', reqReputation: 0,
+  },
+  {
+    id: 'senior', name: '资深科学家', desc: '大幅提高数据生成速度',
+    baseCost: 1100, costMult: 1.15, dps: 20, category: 'staff',
+    icon: '&#129491;', reqReputation: 2,
+  },
+  {
+    id: 'professor', name: '教授', desc: '顶级研究人员',
+    baseCost: 15000, costMult: 1.15, dps: 100, category: 'staff',
+    icon: '&#127891;', reqReputation: 5,
+  },
+  {
+    id: 'detector', name: '升级探测器', desc: '每次点击数据 +1',
+    baseCost: 50, costMult: 1.5, clickBonus: 1, category: 'equipment',
+    icon: '&#128225;',
+  },
+  {
+    id: 'cluster', name: '计算集群', desc: '所有自动生成速率 +10%',
+    baseCost: 500, costMult: 2.0, autoBoost: 0.1, category: 'equipment',
+    icon: '&#128187;', reqReputation: 1,
+  },
+  {
+    id: 'accelerator', name: '加速器升级', desc: '点击倍率 +0.5x',
+    baseCost: 5000, costMult: 2.5, clickMult: 0.5, category: 'equipment',
+    icon: '&#9883;', reqReputation: 3,
+  },
+  {
+    id: 'ai', name: '人工智能分析', desc: '所有自动生成速率 +25%',
+    baseCost: 50000, costMult: 2.5, autoBoost: 0.25, category: 'equipment',
+    icon: '&#129302;', reqReputation: 8,
+  },
+];
+
+// ============================================================
+// DATA: DISCOVERIES
+// ============================================================
+const DISCOVERIES = [
+  {
+    id: 'strange_quark', name: '奇夸克', desc: '探测到一种奇特的夸克粒子',
+    dataReq: 500, reputationReward: 1, fundingReward: 50,
+    unlocks: [], icon: '&#9679;',
+  },
+  {
+    id: 'charm_quark', name: '粲夸克', desc: '发现粲夸克，证实了夸克模型的预测',
+    dataReq: 3000, reputationReward: 2, fundingReward: 200,
+    unlocks: [], icon: '&#10040;',
+  },
+  {
+    id: 'tau_lepton', name: '陶子', desc: '发现第三代轻子——陶子',
+    dataReq: 15000, reputationReward: 3, fundingReward: 500,
+    unlocks: [], icon: '&#964;',
+  },
+  {
+    id: 'gluon', name: '胶子', desc: '直接观测到传递强力的胶子',
+    dataReq: 60000, reputationReward: 4, fundingReward: 1500,
+    unlocks: [], icon: '&#8734;',
+  },
+  {
+    id: 'w_boson', name: 'W玻色子', desc: '发现传递弱力的W玻色子',
+    dataReq: 300000, reputationReward: 5, fundingReward: 5000,
+    unlocks: [], icon: 'W',
+  },
+  {
+    id: 'z_boson', name: 'Z玻色子', desc: '发现中性弱力载体Z玻色子',
+    dataReq: 800000, reputationReward: 5, fundingReward: 8000,
+    unlocks: [], icon: 'Z',
+  },
+  {
+    id: 'top_quark', name: '顶夸克', desc: '发现质量最大的夸克——顶夸克',
+    dataReq: 5000000, reputationReward: 8, fundingReward: 30000,
+    unlocks: [], icon: '&#9650;',
+  },
+  {
+    id: 'higgs', name: '希格斯玻色子', desc: '发现赋予粒子质量的希格斯玻色子！',
+    dataReq: 50000000, reputationReward: 15, fundingReward: 200000,
+    unlocks: [], icon: 'H',
+  },
+  {
+    id: 'dark_matter', name: '暗物质粒子', desc: '探测到暗物质粒子的直接证据',
+    dataReq: 500000000, reputationReward: 30, fundingReward: 1000000,
+    unlocks: [], icon: '&#9688;',
+  },
+  {
+    id: 'graviton', name: '引力子', desc: '发现传递引力的引力子，统一了四种基本力',
+    dataReq: 10000000000, reputationReward: 100, fundingReward: 10000000,
+    unlocks: [], icon: 'G',
+  },
+];
+
+// ============================================================
+// DATA: PUBLICATIONS
+// ============================================================
+const PUBLICATIONS = [
+  {
+    id: 'note', name: '研究简报', desc: '发表一份简短的研究笔记',
+    dataCost: 100, fundingReward: 20, reputationReward: 0,
+  },
+  {
+    id: 'paper', name: '学术论文', desc: '在专业期刊发表论文',
+    dataCost: 2000, fundingReward: 300, reputationReward: 1,
+    reqReputation: 2,
+  },
+  {
+    id: 'review', name: '综述文章', desc: '撰写领域综述，影响力更大',
+    dataCost: 25000, fundingReward: 3000, reputationReward: 3,
+    reqReputation: 6,
+  },
+  {
+    id: 'nature', name: 'Nature / Science', desc: '在顶级期刊发表重磅成果',
+    dataCost: 500000, fundingReward: 50000, reputationReward: 10,
+    reqReputation: 12,
+  },
+  {
+    id: 'nobel', name: '诺贝尔奖提名论文', desc: '足以改变物理学的里程碑论文',
+    dataCost: 50000000, fundingReward: 2000000, reputationReward: 50,
+    reqReputation: 30,
+  },
+];
+
+// ============================================================
+// FORMAT NUMBERS
+// ============================================================
+function fmt(n) {
+  if (n === undefined || n === null || isNaN(n)) return '0';
+  if (n < 0) return '-' + fmt(-n);
+  if (n < 1000) return Math.floor(n).toString();
+  const suffixes = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc'];
+  let tier = Math.floor(Math.log10(n) / 3);
+  if (tier >= suffixes.length) tier = suffixes.length - 1;
+  if (tier === 0) return Math.floor(n).toString();
+  const scale = Math.pow(10, tier * 3);
+  const scaled = n / scale;
+  return scaled.toFixed(scaled < 10 ? 2 : (scaled < 100 ? 1 : 0)) + suffixes[tier];
+}
+
+function fmtTime(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}小时${m}分${sec}秒`;
+  if (m > 0) return `${m}分${sec}秒`;
+  return `${sec}秒`;
+}
+
+// ============================================================
+// UPGRADE COST CALCULATION
+// ============================================================
+function getUpgradeCost(upg) {
+  const count = state.upgrades[upg.id] || 0;
+  return Math.floor(upg.baseCost * Math.pow(upg.costMult, count));
+}
+
+// ============================================================
+// RECALCULATE RATES
+// ============================================================
+function recalculate() {
+  let dps = 0;
+  let autoBoost = 1;
+  let clickBonus = 0;
+  let clickMult = 1;
+
+  // Auto boost from clusters, AI, etc.
+  UPGRADES.forEach(u => {
+    const count = state.upgrades[u.id] || 0;
+    if (count === 0) return;
+    if (u.dps) dps += u.dps * count;
+    if (u.autoBoost) autoBoost += u.autoBoost * count;
+    if (u.clickBonus) clickBonus += u.clickBonus * count;
+    if (u.clickMult) clickMult += u.clickMult * count;
+  });
+
+  state.dataPerSecond = dps * autoBoost;
+  state.dataPerClick = 1 + clickBonus;
+  state.clickMultiplier = clickMult;
+}
+
+// ============================================================
+// PARTICLE ANIMATION
+// ============================================================
+const canvas = document.getElementById('collision-canvas');
+const ctx = canvas.getContext('2d');
+let particles = [];
+let bgParticles = [];
+let trails = [];
+
+function resizeCanvas() {
+  const area = document.getElementById('collision-area');
+  canvas.width = area.clientWidth;
+  canvas.height = area.clientHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// Background ambient particles
+function initBgParticles() {
+  bgParticles = [];
+  for (let i = 0; i < 40; i++) {
+    bgParticles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 1.5 + 0.5,
+      alpha: Math.random() * 0.3 + 0.1,
+    });
+  }
+}
+initBgParticles();
+
+// Colors for collision particles
+const pColors = [
+  '#60a5fa', '#a78bfa', '#f472b6', '#34d399', '#fbbf24',
+  '#fb923c', '#c084fc', '#22d3ee', '#f87171', '#a3e635',
+];
+
+function spawnCollisionParticles(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 4 + 2;
+    const color = pColors[Math.floor(Math.random() * pColors.length)];
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: Math.random() * 3 + 1.5,
+      life: 1,
+      decay: Math.random() * 0.015 + 0.01,
+      color,
+    });
+  }
+  // Add trails/lines from center
+  for (let i = 0; i < count / 2; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const len = Math.random() * 60 + 30;
+    trails.push({
+      x, y,
+      ex: x + Math.cos(angle) * len,
+      ey: y + Math.sin(angle) * len,
+      life: 1,
+      decay: 0.025,
+      color: pColors[Math.floor(Math.random() * pColors.length)],
+    });
+  }
+}
+
+function drawRing(x, y, radius, alpha) {
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(96,165,250,${alpha})`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+let ringEffects = [];
+
+function animLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw grid
+  ctx.strokeStyle = 'rgba(59,130,246,0.04)';
+  ctx.lineWidth = 1;
+  const gridSize = 40;
+  for (let x = 0; x < canvas.width; x += gridSize) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+  }
+  for (let y = 0; y < canvas.height; y += gridSize) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+  }
+
+  // Background particles
+  bgParticles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = canvas.width;
+    if (p.x > canvas.width) p.x = 0;
+    if (p.y < 0) p.y = canvas.height;
+    if (p.y > canvas.height) p.y = 0;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(148,163,184,${p.alpha})`;
+    ctx.fill();
+  });
+
+  // Connect nearby bg particles
+  for (let i = 0; i < bgParticles.length; i++) {
+    for (let j = i + 1; j < bgParticles.length; j++) {
+      const dx = bgParticles[i].x - bgParticles[j].x;
+      const dy = bgParticles[i].y - bgParticles[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 80) {
+        ctx.beginPath();
+        ctx.moveTo(bgParticles[i].x, bgParticles[i].y);
+        ctx.lineTo(bgParticles[j].x, bgParticles[j].y);
+        ctx.strokeStyle = `rgba(59,130,246,${0.06 * (1 - dist / 80)})`;
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Trails
+  trails = trails.filter(t => {
+    t.life -= t.decay;
+    if (t.life <= 0) return false;
+    ctx.beginPath();
+    ctx.moveTo(t.x, t.y);
+    ctx.lineTo(t.ex, t.ey);
+    ctx.strokeStyle = t.color.replace(')', `,${t.life * 0.6})`).replace('rgb', 'rgba');
+    // Workaround for hex colors
+    const alpha = t.life * 0.6;
+    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    return true;
+  });
+
+  // Ring effects
+  ringEffects = ringEffects.filter(r => {
+    r.radius += 2;
+    r.life -= 0.02;
+    if (r.life <= 0) return false;
+    drawRing(r.x, r.y, r.radius, r.life * 0.3);
+    return true;
+  });
+
+  // Collision particles
+  particles = particles.filter(p => {
+    p.life -= p.decay;
+    if (p.life <= 0) return false;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vx *= 0.99;
+    p.vy *= 0.99;
+
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life;
+    ctx.fill();
+
+    // Glow
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.life * 0.15;
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    return true;
+  });
+
+  // Center cross-hair
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  ctx.strokeStyle = 'rgba(59,130,246,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, 12, 0, Math.PI * 2); ctx.stroke();
+
+  requestAnimationFrame(animLoop);
+}
+animLoop();
+
+// ============================================================
+// CLICK HANDLER
+// ============================================================
+function handleClick(e) {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const amount = state.dataPerClick * state.clickMultiplier;
+  state.data += amount;
+  state.totalData += amount;
+  state.clicks++;
+
+  // Spawn particles
+  const count = Math.min(8 + Math.floor(state.clickMultiplier * 3), 40);
+  spawnCollisionParticles(x, y, count);
+  ringEffects.push({ x, y, radius: 5, life: 1 });
+
+  // Floating number
+  const floater = document.createElement('div');
+  floater.className = 'float-number';
+  floater.textContent = '+' + fmt(amount);
+  floater.style.left = x + 'px';
+  floater.style.top = y + 'px';
+  document.getElementById('collision-area').appendChild(floater);
+  setTimeout(() => floater.remove(), 1000);
+}
+
+// ============================================================
+// TABS
+// ============================================================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+    document.getElementById(btn.dataset.tab + '-tab').style.display = '';
+  });
+});
+
+// ============================================================
+// RENDER: UPGRADES
+// ============================================================
+function renderUpgrades() {
+  const container = document.getElementById('upgrades-list');
+  container.innerHTML = '';
+
+  UPGRADES.forEach(u => {
+    const count = state.upgrades[u.id] || 0;
+    const cost = getUpgradeCost(u);
+    const affordable = state.data >= cost;
+    const locked = u.reqReputation && state.reputation < u.reqReputation;
+
+    const div = document.createElement('div');
+    div.className = 'upgrade-card' + (affordable && !locked ? ' affordable' : '') + (locked ? ' locked' : '');
+
+    let effectText = '';
+    if (u.dps) effectText = `+${u.dps} 数据/秒 (总计: ${fmt(u.dps * count)}/秒)`;
+    if (u.clickBonus) effectText = `每次点击 +${u.clickBonus} (总计: +${count * u.clickBonus})`;
+    if (u.autoBoost) effectText = `自动生成 +${(u.autoBoost * 100).toFixed(0)}% (总计: +${(count * u.autoBoost * 100).toFixed(0)}%)`;
+    if (u.clickMult) effectText = `点击倍率 +${u.clickMult}x (总计: +${(count * u.clickMult).toFixed(1)}x)`;
+
+    let lockText = '';
+    if (locked) lockText = `<div class="upgrade-desc" style="color:var(--red);">需要 ${u.reqReputation} 声望解锁</div>`;
+
+    div.innerHTML = `
+      <div class="upgrade-header">
+        <span class="upgrade-name">${u.icon || ''} ${u.name}</span>
+        <span class="upgrade-count">${count}</span>
+      </div>
+      <div class="upgrade-desc">${u.desc}</div>
+      ${lockText}
+      <div class="upgrade-cost">费用: ${fmt(cost)} 数据</div>
+      <div class="upgrade-effect">${effectText}</div>
+    `;
+
+    if (!locked) {
+      div.addEventListener('click', () => buyUpgrade(u));
+    }
+
+    container.appendChild(div);
+  });
+}
+
+function buyUpgrade(u) {
+  const cost = getUpgradeCost(u);
+  if (state.data < cost) return;
+  state.data -= cost;
+  state.upgrades[u.id] = (state.upgrades[u.id] || 0) + 1;
+  recalculate();
+  addLog(`购买了 ${u.name} (共${state.upgrades[u.id]}个)`, 'upgrade');
+  renderUpgrades();
+  renderStaffSummary();
+}
+
+// ============================================================
+// RENDER: DISCOVERIES
+// ============================================================
+function renderDiscoveries() {
+  const container = document.getElementById('research-tab');
+  container.innerHTML = '';
+
+  DISCOVERIES.forEach(d => {
+    const completed = state.discoveries[d.id] || false;
+    const progress = Math.min(state.totalData / d.dataReq, 1);
+
+    const div = document.createElement('div');
+    div.className = 'discovery-card' + (completed ? ' completed' : (progress > 0 ? ' active' : ''));
+
+    div.innerHTML = `
+      <div class="discovery-header">
+        <span class="discovery-name">${d.icon || ''} ${d.name}</span>
+        <span class="discovery-status ${completed ? 'done' : 'pending'}">${completed ? '已发现' : '研究中'}</span>
+      </div>
+      <div class="discovery-desc">${d.desc}</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" style="width:${progress * 100}%"></div>
+      </div>
+      <div class="discovery-progress-text">${fmt(Math.min(state.totalData, d.dataReq))} / ${fmt(d.dataReq)}</div>
+      <div class="discovery-reward">奖励: +${d.reputationReward} 声望, +${fmt(d.fundingReward)} 经费</div>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+function checkDiscoveries() {
+  DISCOVERIES.forEach(d => {
+    if (state.discoveries[d.id]) return;
+    if (state.totalData >= d.dataReq) {
+      state.discoveries[d.id] = true;
+      state.reputation += d.reputationReward;
+      state.totalReputation += d.reputationReward;
+      state.funding += d.fundingReward;
+      state.totalFunding += d.fundingReward;
+      addLog(`重大发现: ${d.name}! +${d.reputationReward}声望 +${fmt(d.fundingReward)}经费`, 'discovery');
+      showAchievement(`发现了 ${d.name}!`);
+      recalculate();
+      renderUpgrades();
+      renderDiscoveries();
+    }
+  });
+}
+
+// ============================================================
+// RENDER: PUBLICATIONS
+// ============================================================
+function renderPublications() {
+  const container = document.getElementById('publications-tab');
+  container.innerHTML = '';
+
+  PUBLICATIONS.forEach(p => {
+    const locked = p.reqReputation && state.reputation < p.reqReputation;
+    const affordable = state.data >= p.dataCost;
+    const count = state.publications[p.id] || 0;
+
+    const div = document.createElement('div');
+    div.className = 'pub-card';
+    if (locked) div.style.opacity = '0.4';
+
+    div.innerHTML = `
+      <div class="pub-info">
+        <div class="pub-name">${p.name}</div>
+        <div class="pub-desc">${p.desc}</div>
+        <div class="pub-stats">已发表: ${count} 篇 | 费用: ${fmt(p.dataCost)} 数据 | 收益: +${fmt(p.fundingReward)} 经费${p.reputationReward ? ' +' + p.reputationReward + ' 声望' : ''}</div>
+        ${locked ? `<div class="pub-stats" style="color:var(--red);">需要 ${p.reqReputation} 声望解锁</div>` : ''}
+      </div>
+      <button class="pub-btn" ${(!affordable || locked) ? 'disabled' : ''}>发表</button>
+    `;
+
+    const btn = div.querySelector('.pub-btn');
+    if (!locked && affordable) {
+      btn.addEventListener('click', () => publish(p));
+    }
+
+    container.appendChild(div);
+  });
+}
+
+function publish(p) {
+  if (state.data < p.dataCost) return;
+  state.data -= p.dataCost;
+  state.funding += p.fundingReward;
+  state.totalFunding += p.fundingReward;
+  state.reputation += (p.reputationReward || 0);
+  state.totalReputation += (p.reputationReward || 0);
+  state.publications[p.id] = (state.publications[p.id] || 0) + 1;
+  state.totalPapers++;
+  addLog(`发表了 ${p.name}, 获得 ${fmt(p.fundingReward)} 经费`, 'publish');
+  renderPublications();
+  renderUpgrades();
+}
+
+// ============================================================
+// RENDER: STATS TAB
+// ============================================================
+function renderStatsTab() {
+  const elapsed = Date.now() - state.startTime;
+  const container = document.getElementById('stats-tab');
+  container.innerHTML = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="discovery-card">
+        <div class="discovery-name" style="margin-bottom:8px;">生产统计</div>
+        <div class="stat-row"><span class="stat-label">总数据量</span><span class="stat-value">${fmt(state.totalData)}</span></div>
+        <div class="stat-row"><span class="stat-label">总点击次数</span><span class="stat-value">${fmt(state.clicks)}</span></div>
+        <div class="stat-row"><span class="stat-label">每秒数据</span><span class="stat-value">${fmt(state.dataPerSecond)}</span></div>
+        <div class="stat-row"><span class="stat-label">每次点击</span><span class="stat-value">${fmt(state.dataPerClick * state.clickMultiplier)}</span></div>
+      </div>
+      <div class="discovery-card">
+        <div class="discovery-name" style="margin-bottom:8px;">成就统计</div>
+        <div class="stat-row"><span class="stat-label">总经费</span><span class="stat-value" style="color:var(--green);">${fmt(state.totalFunding)}</span></div>
+        <div class="stat-row"><span class="stat-label">总声望</span><span class="stat-value" style="color:var(--yellow);">${fmt(state.totalReputation)}</span></div>
+        <div class="stat-row"><span class="stat-label">发现数量</span><span class="stat-value">${Object.keys(state.discoveries).length} / ${DISCOVERIES.length}</span></div>
+        <div class="stat-row"><span class="stat-label">论文总数</span><span class="stat-value">${state.totalPapers}</span></div>
+      </div>
+      <div class="discovery-card" style="grid-column: span 2;">
+        <div class="discovery-name" style="margin-bottom:8px;">人员与设备</div>
+        ${UPGRADES.map(u => {
+          const c = state.upgrades[u.id] || 0;
+          return c > 0 ? `<div class="stat-row"><span class="stat-label">${u.name}</span><span class="stat-value">${c}</span></div>` : '';
+        }).join('')}
+      </div>
+      <div class="discovery-card" style="grid-column: span 2;">
+        <div class="discovery-name" style="margin-bottom:8px;">游戏时间</div>
+        <div class="stat-row"><span class="stat-label">游戏时长</span><span class="stat-value">${fmtTime(elapsed)}</span></div>
+        <div class="stat-row"><span class="stat-label">开始时间</span><span class="stat-value">${new Date(state.startTime).toLocaleString('zh-CN')}</span></div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// RENDER: STAFF SUMMARY (Right Panel)
+// ============================================================
+function renderStaffSummary() {
+  const container = document.getElementById('staff-summary');
+  let html = '';
+  UPGRADES.forEach(u => {
+    const c = state.upgrades[u.id] || 0;
+    if (c > 0) {
+      html += `<div class="stat-row"><span class="stat-label">${u.icon} ${u.name}</span><span class="stat-value">${c}</span></div>`;
+    }
+  });
+  if (!html) html = '<div class="stat-row" style="color:var(--text-dim);font-size:12px;">暂无人员</div>';
+  container.innerHTML = html;
+}
+
+// ============================================================
+// EVENT LOG
+// ============================================================
+function addLog(message, type) {
+  const log = document.getElementById('event-log');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry' + (type ? ` log-${type}` : '');
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+  entry.innerHTML = `<span class="log-time">[${timeStr}]</span>${message}`;
+  log.insertBefore(entry, log.firstChild);
+  // Keep log manageable
+  while (log.children.length > 100) {
+    log.removeChild(log.lastChild);
+  }
+}
+
+// ============================================================
+// ACHIEVEMENT POPUP
+// ============================================================
+function showAchievement(text) {
+  const popup = document.createElement('div');
+  popup.className = 'achievement-popup';
+  popup.innerHTML = `<div class="ach-title">新发现!</div><div class="ach-name">${text}</div>`;
+  document.body.appendChild(popup);
+  setTimeout(() => popup.remove(), 3200);
+}
+
+// ============================================================
+// UI UPDATE
+// ============================================================
+function updateUI() {
+  document.getElementById('res-data').textContent = fmt(state.data);
+  document.getElementById('res-data-rate').textContent = `(+${fmt(state.dataPerSecond)}/秒)`;
+  document.getElementById('res-funding').textContent = fmt(state.funding);
+  document.getElementById('res-reputation').textContent = fmt(state.reputation);
+  document.getElementById('dpc-val').textContent = fmt(state.dataPerClick * state.clickMultiplier);
+  document.getElementById('stat-dps').textContent = fmt(state.dataPerSecond);
+  document.getElementById('stat-dpc').textContent = fmt(state.dataPerClick * state.clickMultiplier);
+  document.getElementById('stat-mult').textContent = 'x' + state.clickMultiplier.toFixed(1);
+}
+
+// ============================================================
+// GAME TICK
+// ============================================================
+function gameTick() {
+  const now = Date.now();
+  const dt = (now - state.lastTick) / 1000;
+  state.lastTick = now;
+
+  // Auto-generate data
+  if (state.dataPerSecond > 0) {
+    const generated = state.dataPerSecond * dt;
+    state.data += generated;
+    state.totalData += generated;
+  }
+
+  // Check discoveries
+  checkDiscoveries();
+
+  // Update UI
+  updateUI();
+}
+
+// Slower UI updates for lists
+let slowTickCounter = 0;
+function slowTick() {
+  slowTickCounter++;
+  renderUpgrades();
+  renderPublications();
+  if (slowTickCounter % 3 === 0) {
+    renderDiscoveries();
+    renderStatsTab();
+  }
+}
+
+// ============================================================
+// SAVE / LOAD
+// ============================================================
+function saveGame() {
+  state.lastSave = Date.now();
+  try {
+    localStorage.setItem('particleClicker_save', JSON.stringify(state));
+    const ind = document.getElementById('save-indicator');
+    ind.textContent = '已保存';
+    ind.style.opacity = '1';
+    setTimeout(() => { ind.style.opacity = '0'; }, 2000);
+  } catch(e) {
+    console.warn('Save failed:', e);
+  }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem('particleClicker_save');
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    // Merge saved state
+    Object.keys(saved).forEach(k => {
+      if (saved[k] !== undefined) state[k] = saved[k];
+    });
+    return true;
+  } catch(e) {
+    console.warn('Load failed:', e);
+    return false;
+  }
+}
+
+function calculateOfflineProgress() {
+  const now = Date.now();
+  const elapsed = (now - state.lastTick) / 1000;
+  if (elapsed > 10) { // More than 10 seconds away
+    recalculate();
+    const offlineData = state.dataPerSecond * elapsed * 0.5; // 50% efficiency offline
+    if (offlineData > 0) {
+      state.data += offlineData;
+      state.totalData += offlineData;
+      addLog(`离线期间产生了 ${fmt(offlineData)} 数据 (${fmtTime(elapsed * 1000)})`, '');
+    }
+  }
+  state.lastTick = now;
+}
+
+function resetGame() {
+  if (!confirm('确定要重置游戏吗？所有进度将丢失！')) return;
+  localStorage.removeItem('particleClicker_save');
+  location.reload();
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+function init() {
+  const loaded = loadGame();
+
+  if (loaded) {
+    calculateOfflineProgress();
+  }
+
+  recalculate();
+  renderUpgrades();
+  renderDiscoveries();
+  renderPublications();
+  renderStatsTab();
+  renderStaffSummary();
+  updateUI();
+
+  if (loaded) {
+    addLog('游戏加载成功，欢迎回来！', '');
+  } else {
+    addLog('欢迎来到粒子点击器！点击碰撞区域开始实验。', '');
+    addLog('积累数据来雇佣研究人员和升级设备。', '');
+  }
+
+  // Fast game tick (10x per second)
+  setInterval(gameTick, 100);
+
+  // Slow UI render (2x per second)
+  setInterval(slowTick, 500);
+
+  // Auto-save every 30 seconds
+  setInterval(saveGame, 30000);
+}
+
+init();
+</script>
+</body>
+</html>

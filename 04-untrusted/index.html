@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>不可信的代码 - Untrusted</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+@font-face {
+  font-family: 'GameMono';
+  src: local('Courier New'), local('Consolas'), local('monospace');
+}
+
+body {
+  background: #0a0a0a;
+  color: #00ff41;
+  font-family: 'Courier New', 'Consolas', monospace;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+#boot-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #000;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #00ff41;
+  font-family: 'Courier New', monospace;
+}
+
+#boot-screen .boot-line {
+  opacity: 0;
+  margin: 3px 0;
+  font-size: 14px;
+}
+
+#boot-screen .title-art {
+  opacity: 0;
+  white-space: pre;
+  font-size: 9px;
+  line-height: 1.1;
+  color: #00ff41;
+  text-align: center;
+  margin: 15px 0;
+  text-shadow: 0 0 10px #00ff41;
+}
+
+#boot-screen .start-prompt {
+  opacity: 0;
+  margin-top: 20px;
+  font-size: 16px;
+  animation: blink-cursor 1s step-end infinite;
+  cursor: pointer;
+}
+
+@keyframes blink-cursor {
+  50% { opacity: 0; }
+}
+
+#game-container {
+  display: none;
+  height: 100vh;
+  width: 100vw;
+  flex-direction: column;
+}
+
+#top-bar {
+  background: #111;
+  border-bottom: 1px solid #00ff41;
+  padding: 6px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 38px;
+  flex-shrink: 0;
+}
+
+#top-bar .title {
+  font-size: 15px;
+  color: #00ff41;
+  text-shadow: 0 0 8px #00ff4166;
+}
+
+#top-bar .level-info {
+  font-size: 13px;
+  color: #00cc33;
+}
+
+#top-bar .controls {
+  display: flex;
+  gap: 8px;
+}
+
+#top-bar button {
+  background: transparent;
+  color: #00ff41;
+  border: 1px solid #00ff41;
+  padding: 4px 14px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+#top-bar button:hover {
+  background: #00ff41;
+  color: #000;
+}
+
+#main-area {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Map Panel */
+#map-panel {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #00883a;
+  background: #050505;
+}
+
+#map-header {
+  padding: 6px 12px;
+  background: #0d0d0d;
+  border-bottom: 1px solid #003d1a;
+  font-size: 12px;
+  color: #009926;
+  flex-shrink: 0;
+}
+
+#map-display {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  overflow: auto;
+}
+
+#map-canvas {
+  font-size: 16px;
+  line-height: 1.2;
+  letter-spacing: 2px;
+  white-space: pre;
+  font-family: 'Courier New', monospace;
+  user-select: none;
+}
+
+#message-bar {
+  padding: 6px 12px;
+  background: #0d0d0d;
+  border-top: 1px solid #003d1a;
+  font-size: 12px;
+  color: #ffcc00;
+  min-height: 28px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Code Panel */
+#code-panel {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  background: #0a0a0a;
+}
+
+#code-header {
+  padding: 6px 12px;
+  background: #0d0d0d;
+  border-bottom: 1px solid #003d1a;
+  font-size: 12px;
+  color: #009926;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+#code-header .hint-btn {
+  background: none;
+  border: 1px solid #665500;
+  color: #ffcc00;
+  padding: 2px 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+#code-header .hint-btn:hover {
+  background: #332b00;
+}
+
+#code-editor-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+}
+
+#code-editor-container {
+  position: relative;
+  min-height: 100%;
+}
+
+#code-highlight {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 10px 12px 10px 48px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: transparent;
+  pointer-events: none;
+  z-index: 1;
+}
+
+#code-editor {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  padding: 10px 12px 10px 48px;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: 'Courier New', monospace;
+  background: transparent;
+  color: #cccccc;
+  border: none;
+  outline: none;
+  resize: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  tab-size: 2;
+  z-index: 2;
+  caret-color: #00ff41;
+}
+
+#line-numbers {
+  position: absolute;
+  top: 0; left: 0;
+  width: 40px;
+  padding: 10px 4px;
+  text-align: right;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: 'Courier New', monospace;
+  color: #444;
+  user-select: none;
+  z-index: 3;
+  pointer-events: none;
+}
+
+#code-footer {
+  padding: 6px 12px;
+  background: #0d0d0d;
+  border-top: 1px solid #003d1a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+#code-footer button {
+  background: transparent;
+  color: #00ff41;
+  border: 1px solid #00ff41;
+  padding: 5px 18px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+#code-footer button:hover {
+  background: #00ff41;
+  color: #000;
+}
+
+#code-footer #btn-execute {
+  border-color: #00ccff;
+  color: #00ccff;
+}
+#code-footer #btn-execute:hover {
+  background: #00ccff;
+  color: #000;
+}
+
+#code-footer #btn-reset {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+#code-footer #btn-reset:hover {
+  background: #ff4444;
+  color: #000;
+}
+
+#code-footer .status {
+  font-size: 11px;
+  color: #666;
+}
+
+/* Modal overlay */
+#modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+#modal-overlay.active {
+  display: flex;
+}
+
+#modal-box {
+  background: #111;
+  border: 2px solid #00ff41;
+  padding: 30px 40px;
+  max-width: 500px;
+  text-align: center;
+  box-shadow: 0 0 40px #00ff4133;
+}
+
+#modal-box h2 {
+  color: #00ff41;
+  font-size: 22px;
+  margin-bottom: 15px;
+  text-shadow: 0 0 10px #00ff41;
+}
+
+#modal-box p {
+  color: #00cc33;
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+#modal-box button {
+  background: transparent;
+  color: #00ff41;
+  border: 1px solid #00ff41;
+  padding: 8px 30px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+#modal-box button:hover {
+  background: #00ff41;
+  color: #000;
+}
+
+/* Syntax highlighting colors */
+.sh-keyword { color: #cc99ff; }
+.sh-string { color: #ffd700; }
+.sh-number { color: #ff6666; }
+.sh-comment { color: #555555; font-style: italic; }
+.sh-function { color: #66ccff; }
+.sh-operator { color: #ff8844; }
+.sh-bracket { color: #888; }
+.sh-variable { color: #44ddaa; }
+.sh-property { color: #88ccff; }
+.sh-boolean { color: #ff8888; }
+
+/* Map tile colors */
+.tile-wall { color: #666; }
+.tile-floor { color: #1a1a1a; }
+.tile-player { color: #00ff41; font-weight: bold; text-shadow: 0 0 8px #00ff41; }
+.tile-exit { color: #ffd700; text-shadow: 0 0 8px #ffd700; }
+.tile-enemy { color: #ff4444; text-shadow: 0 0 6px #ff4444; }
+.tile-gap { color: #000066; }
+.tile-bridge { color: #886633; }
+.tile-key { color: #ff00ff; text-shadow: 0 0 6px #ff00ff; }
+.tile-door { color: #ff8800; }
+.tile-trap { color: #ff3333; }
+.tile-code { color: #00ccff; text-shadow: 0 0 6px #00ccff; }
+.tile-teleport { color: #cc66ff; text-shadow: 0 0 6px #cc66ff; }
+
+/* Scanline effect */
+#scanline-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+}
+
+/* Instruction panel styling */
+.instruction-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.92);
+  z-index: 800;
+  justify-content: center;
+  align-items: center;
+}
+
+.instruction-overlay.active {
+  display: flex;
+}
+
+.instruction-box {
+  background: #0a0a0a;
+  border: 2px solid #00ff41;
+  padding: 30px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 0 50px #00ff4122;
+}
+
+.instruction-box h2 {
+  color: #00ff41;
+  font-size: 20px;
+  margin-bottom: 18px;
+  text-shadow: 0 0 10px #00ff41;
+  text-align: center;
+}
+
+.instruction-box p, .instruction-box li {
+  color: #00cc33;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+
+.instruction-box ul {
+  padding-left: 20px;
+  margin-bottom: 15px;
+}
+
+.instruction-box code {
+  background: #1a1a1a;
+  color: #ffd700;
+  padding: 1px 5px;
+  font-size: 12px;
+}
+
+.instruction-box .close-btn {
+  display: block;
+  margin: 20px auto 0;
+  background: transparent;
+  color: #00ff41;
+  border: 1px solid #00ff41;
+  padding: 8px 30px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.instruction-box .close-btn:hover {
+  background: #00ff41;
+  color: #000;
+}
+
+/* Locked lines indicator */
+.locked-indicator {
+  display: inline-block;
+  font-size: 10px;
+  color: #663333;
+  margin-left: 8px;
+}
+</style>
+</head>
+<body>
+
+<!-- Boot screen -->
+<div id="boot-screen">
+  <div class="boot-line" id="bl1">[系统] 正在初始化终端...</div>
+  <div class="boot-line" id="bl2">[系统] 加载核心模块... OK</div>
+  <div class="boot-line" id="bl3">[系统] 检测安全协议... 已绕过</div>
+  <div class="boot-line" id="bl4">[警告] 发现不可信的代码段!</div>
+  <div class="title-art" id="title-art">
+ ██╗   ██╗ ███╗   ██╗ ████████╗ ██████╗  ██╗   ██╗ ███████╗ ████████╗ ███████╗ ██████╗
+ ██║   ██║ ████╗  ██║ ╚══██╔══╝ ██╔══██╗ ██║   ██║ ██╔════╝ ╚══██╔══╝ ██╔════╝ ██╔══██╗
+ ██║   ██║ ██╔██╗ ██║    ██║    ██████╔╝ ██║   ██║ ███████╗    ██║    █████╗   ██║  ██║
+ ██║   ██║ ██║╚██╗██║    ██║    ██╔══██╗ ██║   ██║ ╚════██║    ██║    ██╔══╝   ██║  ██║
+ ╚██████╔╝ ██║ ╚████║    ██║    ██║  ██║ ╚██████╔╝ ███████║    ██║    ███████╗ ██████╔╝
+  ╚═════╝  ╚═╝  ╚═══╝    ╚═╝    ╚═╝  ╚═╝  ╚═════╝  ╚══════╝    ╚═╝    ╚══════╝ ╚═════╝
+               不  可  信  的  代  码
+</div>
+  <div class="boot-line" id="bl5">[系统] 修改代码，逃出迷宫，揭开真相。</div>
+  <div class="start-prompt" id="start-prompt">[ 按任意键开始 ]</div>
+</div>
+
+<!-- Scanline overlay -->
+<div id="scanline-overlay"></div>
+
+<!-- Main game -->
+<div id="game-container">
+  <div id="top-bar">
+    <span class="title">// 不可信的代码 v1.0</span>
+    <span class="level-info" id="level-info">第 1 关 / 共 5 关</span>
+    <div class="controls">
+      <button id="btn-help" title="帮助">[ ? 帮助 ]</button>
+    </div>
+  </div>
+  <div id="main-area">
+    <!-- Map side -->
+    <div id="map-panel">
+      <div id="map-header">// 地图视图 - 用方向键移动 @</div>
+      <div id="map-display">
+        <div id="map-canvas"></div>
+      </div>
+      <div id="message-bar" id="msg-bar">&gt; 准备就绪。修改右侧代码来改变地图。</div>
+    </div>
+    <!-- Code side -->
+    <div id="code-panel">
+      <div id="code-header">
+        <span>// 代码编辑器 - 修改下方代码来解谜</span>
+        <button class="hint-btn" id="btn-hint">[ 提示 ]</button>
+      </div>
+      <div id="code-editor-wrapper">
+        <div id="code-editor-container">
+          <div id="line-numbers"></div>
+          <div id="code-highlight"></div>
+          <textarea id="code-editor" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div id="code-footer">
+        <button id="btn-execute">[ 执行代码 ]</button>
+        <span class="status" id="exec-status"></span>
+        <button id="btn-reset">[ 重置代码 ]</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Level complete modal -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <h2 id="modal-title">关卡完成！</h2>
+    <p id="modal-text">你成功修改了代码并到达了出口。</p>
+    <button id="modal-btn">[ 下一关 ]</button>
+  </div>
+</div>
+
+<!-- Instructions overlay -->
+<div class="instruction-overlay" id="instruction-overlay">
+  <div class="instruction-box">
+    <h2>// 游戏说明</h2>
+    <p><b>「不可信的代码」</b> 是一款编程解谜游戏。你被困在由代码生成的迷宫中，唯一的出路就是 <b>修改生成地图的 JavaScript 代码</b>。</p>
+    <ul>
+      <li><code>@</code> 是你的角色，用 <b>方向键</b> 移动</li>
+      <li><code>★</code> 是出口，到达即通关</li>
+      <li><code>#</code> 是墙壁，无法通过</li>
+      <li><code>~</code> 是深渊，掉入会重置</li>
+      <li><code>E</code> 是敌人，碰到会重置</li>
+    </ul>
+    <p><b>核心玩法：</b></p>
+    <ul>
+      <li>阅读右侧的 JavaScript 代码，理解地图是如何生成的</li>
+      <li>找到代码中被标记为 <code>// 可编辑区域</code> 的部分</li>
+      <li>修改代码以改变地图布局、敌人行为等</li>
+      <li>点击 <b>[ 执行代码 ]</b> 来应用你的修改</li>
+      <li>然后用方向键走到出口 <code>★</code></li>
+    </ul>
+    <p style="color:#ffcc00;">提示：只有被标记为"可编辑区域"的代码可以修改，其余部分会被锁定。</p>
+    <button class="close-btn" id="close-help">[ 明白了 ]</button>
+  </div>
+</div>
+
+<script>
+// ============================================
+//  不可信的代码 - Untrusted Style Puzzle Game
+// ============================================
+
+(function() {
+'use strict';
+
+// ----- Game State -----
+const COLS = 40;
+const ROWS = 25;
+let currentLevel = 0;
+let map = [];
+let playerX = 1, playerY = 1;
+let exitX = 0, exitY = 0;
+let enemies = [];
+let gameActive = false;
+let enemyInterval = null;
+let hasKey = false;
+
+// ----- Tile definitions -----
+const TILES = {
+  FLOOR: '.',
+  WALL: '#',
+  PLAYER: '@',
+  EXIT: '\u2605',
+  ENEMY: 'E',
+  GAP: '~',
+  BRIDGE: '=',
+  KEY: '\u2666',
+  DOOR: 'D',
+  TRAP: '^',
+  TELEPORT: 'O'
+};
+
+const TILE_CLASSES = {
+  '.': 'tile-floor',
+  '#': 'tile-wall',
+  '@': 'tile-player',
+  '\u2605': 'tile-exit',
+  'E': 'tile-enemy',
+  '~': 'tile-gap',
+  '=': 'tile-bridge',
+  '\u2666': 'tile-key',
+  'D': 'tile-door',
+  '^': 'tile-trap',
+  'O': 'tile-teleport'
+};
+
+// ----- Level Definitions -----
+const levels = [
+  // ===== LEVEL 1: Remove walls =====
+  {
+    name: '第一关：破壁',
+    description: '一堵墙挡住了去路。修改代码来移除它。',
+    hint: '提示：试试把生成墙壁的循环条件改一下，让墙不要把路完全封死。比如修改墙壁的起止行范围。',
+    // Locked prefix code
+    lockedPrefix: [
+      '// 第一关：破壁',
+      '// 目标：到达出口 ★',
+      '// 一堵墙挡住了你的去路，修改代码来打开通路',
+      '',
+      'function generateMap(map, ROWS, COLS) {',
+      '  // 初始化地板',
+      '  for (let y = 0; y < ROWS; y++)',
+      '    for (let x = 0; x < COLS; x++)',
+      '      map[y][x] = ".";',
+      '',
+      '  // 四周围墙',
+      '  for (let x = 0; x < COLS; x++) {',
+      '    map[0][x] = "#";',
+      '    map[ROWS-1][x] = "#";',
+      '  }',
+      '  for (let y = 0; y < ROWS; y++) {',
+      '    map[y][0] = "#";',
+      '    map[y][COLS-1] = "#";',
+      '  }',
+      '',
+    ].join('\n'),
+    // Editable code (player modifies this)
+    editableCode: [
+      '  // ===== 可编辑区域开始 =====',
+      '  // 生成一堵竖墙，从第1行到第23行',
+      '  // 改变循环范围来打开缺口！',
+      '  for (let y = 1; y < ROWS - 1; y++) {',
+      '    map[y][20] = "#";',
+      '  }',
+      '  // ===== 可编辑区域结束 =====',
+    ].join('\n'),
+    // Locked suffix code
+    lockedSuffix: [
+      '',
+      '  // 放置玩家和出口',
+      '  map[12][3] = "@";',
+      '  map[12][37] = "\\u2605";',
+      '',
+      '  return map;',
+      '}',
+    ].join('\n'),
+    playerStart: [3, 12],
+    exitPos: [37, 12],
+    enemies: [],
+    validate: function(m) { return true; }
+  },
+
+  // ===== LEVEL 2: Change start position =====
+  {
+    name: '第二关：重生点',
+    description: '你被困在一个封闭的小房间里。修改你的出生位置来逃出。',
+    hint: '提示：改变玩家的起始坐标 playerStartX 和 playerStartY，把自己放到墙外面去。',
+    lockedPrefix: [
+      '// 第二关：重生点',
+      '// 目标：你被困在封闭房间里，改变出生点逃出',
+      '',
+      'function generateMap(map, ROWS, COLS) {',
+      '  for (let y = 0; y < ROWS; y++)',
+      '    for (let x = 0; x < COLS; x++)',
+      '      map[y][x] = ".";',
+      '',
+      '  // 四周围墙',
+      '  for (let x = 0; x < COLS; x++) {',
+      '    map[0][x] = "#";',
+      '    map[ROWS-1][x] = "#";',
+      '  }',
+      '  for (let y = 0; y < ROWS; y++) {',
+      '    map[y][0] = "#";',
+      '    map[y][COLS-1] = "#";',
+      '  }',
+      '',
+      '  // 封闭的小房间 (5,5) 到 (12,12)',
+      '  for (let x = 5; x <= 12; x++) {',
+      '    map[5][x] = "#";',
+      '    map[12][x] = "#";',
+      '  }',
+      '  for (let y = 5; y <= 12; y++) {',
+      '    map[y][5] = "#";',
+      '    map[y][12] = "#";',
+      '  }',
+      '',
+    ].join('\n'),
+    editableCode: [
+      '  // ===== 可编辑区域开始 =====',
+      '  // 玩家出生位置（当前在封闭房间内）',
+      '  // 修改坐标让玩家出生在房间外面！',
+      '  let playerStartX = 8;',
+      '  let playerStartY = 8;',
+      '  // ===== 可编辑区域结束 =====',
+    ].join('\n'),
+    lockedSuffix: [
+      '',
+      '  // 放置玩家和出口',
+      '  map[playerStartY][playerStartX] = "@";',
+      '  map[20][35] = "\\u2605";',
+      '',
+      '  return map;',
+      '}',
+    ].join('\n'),
+    playerStart: [8, 8],
+    exitPos: [35, 20],
+    enemies: [],
+    validate: function(m) { return true; }
+  },
+
+  // ===== LEVEL 3: Build a bridge =====
+  {
+    name: '第三关：架桥',
+    description: '一条深渊横在面前。修改代码在深渊上架起一座桥。',
+    hint: '提示：在 bridgePositions 数组中添加更多的 x 坐标，让桥连接两岸。桥的 y 坐标是 12。',
+    lockedPrefix: [
+      '// 第三关：架桥',
+      '// 目标：深渊挡住了去路，修改代码架桥通过',
+      '',
+      'function generateMap(map, ROWS, COLS) {',
+      '  for (let y = 0; y < ROWS; y++)',
+      '    for (let x = 0; x < COLS; x++)',
+      '      map[y][x] = ".";',
+      '',
+      '  // 四周围墙',
+      '  for (let x = 0; x < COLS; x++) {',
+      '    map[0][x] = "#";',
+      '    map[ROWS-1][x] = "#";',
+      '  }',
+      '  for (let y = 0; y < ROWS; y++) {',
+      '    map[y][0] = "#";',
+      '    map[y][COLS-1] = "#";',
+      '  }',
+      '',
+      '  // 深渊：从x=15到x=30的区域',
+      '  for (let y = 1; y < ROWS - 1; y++) {',
+      '    for (let x = 15; x <= 30; x++) {',
+      '      map[y][x] = "~";',
+      '    }',
+      '  }',
+      '',
+    ].join('\n'),
+    editableCode: [
+      '  // ===== 可编辑区域开始 =====',
+      '  // 桥的位置（目前桥太短了，过不去！）',
+      '  // 把桥延长，让它从 x=15 一直到 x=30',
+      '  let bridgePositions = [15, 16, 17];',
+      '  for (let bx of bridgePositions) {',
+      '    map[12][bx] = "=";',
+      '  }',
+      '  // ===== 可编辑区域结束 =====',
+    ].join('\n'),
+    lockedSuffix: [
+      '',
+      '  // 放置玩家和出口',
+      '  map[12][3] = "@";',
+      '  map[12][37] = "\\u2605";',
+      '',
+      '  return map;',
+      '}',
+    ].join('\n'),
+    playerStart: [3, 12],
+    exitPos: [37, 12],
+    enemies: [],
+    validate: function(m) { return true; }
+  },
+
+  // ===== LEVEL 4: Modify enemy behavior =====
+  {
+    name: '第四关：驯服怪物',
+    description: '敌人在巡逻，修改它们的移动逻辑来安全通过。',
+    hint: '提示：修改 enemySpeed 为 0 让敌人停止移动，或修改巡逻路径让敌人远离你的路线。',
+    lockedPrefix: [
+      '// 第四关：驯服怪物',
+      '// 目标：敌人在巡逻，修改代码让它们不再威胁你',
+      '',
+      'function generateMap(map, ROWS, COLS) {',
+      '  for (let y = 0; y < ROWS; y++)',
+      '    for (let x = 0; x < COLS; x++)',
+      '      map[y][x] = ".";',
+      '',
+      '  // 四周围墙',
+      '  for (let x = 0; x < COLS; x++) {',
+      '    map[0][x] = "#";',
+      '    map[ROWS-1][x] = "#";',
+      '  }',
+      '  for (let y = 0; y < ROWS; y++) {',
+      '    map[y][0] = "#";',
+      '    map[y][COLS-1] = "#";',
+      '  }',
+      '',
+      '  // 走廊',
+      '  for (let x = 1; x < COLS - 1; x++) {',
+      '    if (x !== 1 && x !== COLS - 2) {',
+      '      map[10][x] = "#";',
+      '      map[14][x] = "#";',
+      '    }',
+      '  }',
+      '',
+    ].join('\n'),
+    editableCode: [
+      '  // ===== 可编辑区域开始 =====',
+      '  // 敌人配置',
+      '  // enemySpeed: 敌人移动速度 (格/次)，设为 0 可停止移动',
+      '  // enemyY: 敌人的纵坐标 (走廊在 y=11 到 y=13)',
+      '  let enemySpeed = 1;',
+      '  let enemyY = 12;',
+      '  let enemyPositions = [10, 18, 26, 34];',
+      '  // ===== 可编辑区域结束 =====',
+    ].join('\n'),
+    lockedSuffix: [
+      '',
+      '  // 放置敌人',
+      '  let enemyList = [];',
+      '  for (let ex of enemyPositions) {',
+      '    if (ex > 0 && ex < COLS-1 && enemyY > 0 && enemyY < ROWS-1',
+      '        && map[enemyY][ex] === ".") {',
+      '      map[enemyY][ex] = "E";',
+      '      enemyList.push({',
+      '        x: ex, y: enemyY,',
+      '        speed: enemySpeed,',
+      '        dir: 1, minX: 2, maxX: COLS-3',
+      '      });',
+      '    }',
+      '  }',
+      '',
+      '  // 放置玩家和出口',
+      '  map[12][2] = "@";',
+      '  map[12][37] = "\\u2605";',
+      '',
+      '  return { map: map, enemies: enemyList };',
+      '}',
+    ].join('\n'),
+    playerStart: [2, 12],
+    exitPos: [37, 12],
+    enemies: [],
+    validate: function(m) { return true; }
+  },
+
+  // ===== LEVEL 5: Complex multi-concept =====
+  {
+    name: '第五关：终极逃脱',
+    description: '最终关卡！你需要同时解决多个问题才能逃出。',
+    hint: '提示：你需要做三件事：1) 在深渊上架桥 (设 buildBridge = true)，2) 打开门 (设 openDoor = true)，3) 让传送门把你传到正确位置 (修改 teleportTargetX/Y)。',
+    lockedPrefix: [
+      '// 第五关：终极逃脱',
+      '// 目标：综合挑战！解决所有障碍到达出口',
+      '',
+      'function generateMap(map, ROWS, COLS) {',
+      '  for (let y = 0; y < ROWS; y++)',
+      '    for (let x = 0; x < COLS; x++)',
+      '      map[y][x] = ".";',
+      '',
+      '  // 四周围墙',
+      '  for (let x = 0; x < COLS; x++) {',
+      '    map[0][x] = "#";',
+      '    map[ROWS-1][x] = "#";',
+      '  }',
+      '  for (let y = 0; y < ROWS; y++) {',
+      '    map[y][0] = "#";',
+      '    map[y][COLS-1] = "#";',
+      '  }',
+      '',
+      '  // 区域分隔墙',
+      '  for (let y = 1; y < ROWS - 1; y++) {',
+      '    map[y][13] = "#";',
+      '    map[y][27] = "#";',
+      '  }',
+      '',
+      '  // 区域1: 深渊 (x: 5-11, y: 10-14)',
+      '  for (let y = 10; y <= 14; y++)',
+      '    for (let x = 5; x <= 11; x++)',
+      '      map[y][x] = "~";',
+      '',
+      '  // 区域2: 门 (在分隔墙上)',
+      '  // 如果openDoor为true，墙上会有缺口',
+      '',
+      '  // 区域3: 传送门',
+      '',
+    ].join('\n'),
+    editableCode: [
+      '  // ===== 可编辑区域开始 =====',
+      '  // [任务1] 架桥：改为 true 来架桥过深渊',
+      '  let buildBridge = false;',
+      '',
+      '  // [任务2] 开门：改为 true 来打开分隔墙的门',
+      '  let openDoor = false;',
+      '',
+      '  // [任务3] 传送目标：传送门O会传送到此坐标',
+      '  // 出口在 (37, 12)，传送目标应在出口附近',
+      '  let teleportTargetX = 1;',
+      '  let teleportTargetY = 1;',
+      '  // ===== 可编辑区域结束 =====',
+    ].join('\n'),
+    lockedSuffix: [
+      '',
+      '  // 根据参数生成地图要素',
+      '  if (buildBridge) {',
+      '    for (let x = 5; x <= 11; x++)',
+      '      map[12][x] = "=";',
+      '  }',
+      '',
+      '  if (openDoor) {',
+      '    map[12][13] = ".";',
+      '    map[11][13] = ".";',
+      '    map[12][27] = ".";',
+      '    map[11][27] = ".";',
+      '  }',
+      '',
+      '  // 传送门放在第二区域的尽头',
+      '  map[12][25] = "O";',
+      '  // 传送目标记录在 map 的元数据中',
+      '  map.teleportTarget = {',
+      '    x: teleportTargetX,',
+      '    y: teleportTargetY',
+      '  };',
+      '',
+      '  // 放置玩家和出口',
+      '  map[12][2] = "@";',
+      '  map[12][37] = "\\u2605";',
+      '',
+      '  return map;',
+      '}',
+    ].join('\n'),
+    playerStart: [2, 12],
+    exitPos: [37, 12],
+    enemies: [],
+    validate: function(m) { return true; }
+  }
+];
+
+
+// ----- Boot Sequence -----
+function bootSequence() {
+  const bootLines = [
+    { id: 'bl1', delay: 200 },
+    { id: 'bl2', delay: 700 },
+    { id: 'bl3', delay: 1200 },
+    { id: 'bl4', delay: 1800 },
+    { id: 'title-art', delay: 2300 },
+    { id: 'bl5', delay: 3000 },
+    { id: 'start-prompt', delay: 3500 }
+  ];
+
+  bootLines.forEach(item => {
+    setTimeout(() => {
+      const el = document.getElementById(item.id);
+      if (el) {
+        el.style.transition = 'opacity 0.4s';
+        el.style.opacity = '1';
+      }
+    }, item.delay);
+  });
+
+  // Wait for key press
+  function startGame() {
+    document.getElementById('boot-screen').style.display = 'none';
+    document.getElementById('game-container').style.display = 'flex';
+    gameActive = true;
+    loadLevel(0);
+    document.removeEventListener('keydown', startGame);
+    document.getElementById('boot-screen').removeEventListener('click', startGame);
+  }
+
+  setTimeout(() => {
+    document.addEventListener('keydown', startGame);
+    document.getElementById('boot-screen').addEventListener('click', startGame);
+  }, 3600);
+}
+
+
+// ----- Map Functions -----
+function createEmptyMap() {
+  let m = [];
+  for (let y = 0; y < ROWS; y++) {
+    m[y] = [];
+    for (let x = 0; x < COLS; x++) {
+      m[y][x] = '.';
+    }
+  }
+  return m;
+}
+
+function renderMap() {
+  const canvas = document.getElementById('map-canvas');
+  let html = '';
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      let ch = map[y][x];
+      // Show player at player position
+      if (x === playerX && y === playerY) {
+        ch = '@';
+      }
+      const cls = TILE_CLASSES[ch] || '';
+      if (cls) {
+        html += '<span class="' + cls + '">' + escapeHtml(ch) + '</span>';
+      } else {
+        html += escapeHtml(ch);
+      }
+    }
+    html += '\n';
+  }
+  canvas.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+
+// ----- Code Editor -----
+function loadCodeForLevel(levelIdx) {
+  const level = levels[levelIdx];
+  const editor = document.getElementById('code-editor');
+  const fullCode = level.lockedPrefix + level.editableCode + level.lockedSuffix;
+  editor.value = fullCode;
+  updateHighlight();
+  updateLineNumbers();
+}
+
+function getEditableRange(levelIdx) {
+  const level = levels[levelIdx];
+  const prefixLen = level.lockedPrefix.length;
+  const editLen = level.editableCode.length;
+  return { start: prefixLen, end: prefixLen + editLen };
+}
+
+// Enforce locked regions
+function enforceLockedRegions(e) {
+  const editor = document.getElementById('code-editor');
+  const level = levels[currentLevel];
+  const range = getEditableRange(currentLevel);
+  const selStart = editor.selectionStart;
+  const selEnd = editor.selectionEnd;
+
+  // Check if selection/cursor is outside editable area
+  const val = editor.value;
+
+  // Reconstruct what the prefix and suffix should be
+  const currentPrefix = val.substring(0, range.start);
+  const currentSuffix = val.substring(val.length - level.lockedSuffix.length);
+
+  // If prefix or suffix was modified, restore
+  if (currentPrefix !== level.lockedPrefix ||
+      currentSuffix !== level.lockedSuffix) {
+    // Extract the middle part
+    const middlePart = val.substring(range.start, val.length - level.lockedSuffix.length);
+    editor.value = level.lockedPrefix + middlePart + level.lockedSuffix;
+    // Try to restore cursor
+    editor.selectionStart = Math.max(range.start, Math.min(selStart, editor.value.length - level.lockedSuffix.length));
+    editor.selectionEnd = Math.max(range.start, Math.min(selEnd, editor.value.length - level.lockedSuffix.length));
+  }
+
+  updateHighlight();
+  updateLineNumbers();
+}
+
+function updateLineNumbers() {
+  const editor = document.getElementById('code-editor');
+  const lines = editor.value.split('\n');
+  const ln = document.getElementById('line-numbers');
+  let html = '';
+  for (let i = 1; i <= lines.length; i++) {
+    html += i + '\n';
+  }
+  ln.textContent = html;
+}
+
+// Basic syntax highlighting
+function syntaxHighlight(code) {
+  // Escape HTML first
+  let html = escapeHtml(code);
+
+  // Comments (// ...)
+  html = html.replace(/(\/\/[^\n]*)/g, '<span class="sh-comment">$1</span>');
+
+  // Strings
+  html = html.replace(/(&quot;[^&]*?&quot;|"[^"]*?"|'[^']*?'|`[^`]*?`)/g, '<span class="sh-string">$1</span>');
+
+  // Keywords
+  const keywords = ['let','const','var','function','for','if','else','return','while','do','switch','case','break','continue','new','typeof','instanceof','in','of','true','false','null','undefined'];
+  keywords.forEach(kw => {
+    const re = new RegExp('\\b(' + kw + ')\\b', 'g');
+    html = html.replace(re, '<span class="sh-keyword">$1</span>');
+  });
+
+  // Numbers
+  html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="sh-number">$1</span>');
+
+  // Brackets
+  html = html.replace(/([{}()\[\]])/g, '<span class="sh-bracket">$1</span>');
+
+  // Operators
+  html = html.replace(/(===|!==|==|!=|&lt;=|&gt;=|&amp;&amp;|\|\||[+\-*/%](?!=))/g, '<span class="sh-operator">$1</span>');
+
+  return html;
+}
+
+function updateHighlight() {
+  const editor = document.getElementById('code-editor');
+  const highlight = document.getElementById('code-highlight');
+  const code = editor.value;
+
+  // Mark locked vs editable regions
+  const level = levels[currentLevel];
+  const range = getEditableRange(currentLevel);
+
+  const prefix = code.substring(0, range.start);
+  const editable = code.substring(range.start, code.length - level.lockedSuffix.length);
+  const suffix = code.substring(code.length - level.lockedSuffix.length);
+
+  let html = '';
+  html += '<span style="opacity:0.45">' + syntaxHighlight(prefix) + '</span>';
+  html += syntaxHighlight(editable);
+  html += '<span style="opacity:0.45">' + syntaxHighlight(suffix) + '</span>';
+
+  // Add trailing newline to match textarea
+  highlight.innerHTML = html + '\n';
+}
+
+
+// ----- Execute User Code -----
+function executeCode() {
+  const editor = document.getElementById('code-editor');
+  const code = editor.value;
+  const statusEl = document.getElementById('exec-status');
+  const msgBar = document.getElementById('message-bar');
+
+  // Clear enemies
+  if (enemyInterval) {
+    clearInterval(enemyInterval);
+    enemyInterval = null;
+  }
+  enemies = [];
+  hasKey = false;
+
+  try {
+    // Create the function from user code
+    // We wrap the code so that generateMap is accessible
+    const factory = new Function(code + '\nreturn generateMap;');
+
+    const genFunc = factory();
+    const newMap = createEmptyMap();
+    const result = genFunc(newMap, ROWS, COLS);
+
+    // Handle result (can be map directly or {map, enemies})
+    let finalMap, newEnemies = [];
+    if (result && result.map && Array.isArray(result.map)) {
+      finalMap = result.map;
+      newEnemies = result.enemies || [];
+    } else if (Array.isArray(result)) {
+      finalMap = result;
+    } else {
+      finalMap = newMap;
+    }
+
+    // Check for teleport target
+    let teleportTarget = null;
+    if (finalMap.teleportTarget) {
+      teleportTarget = finalMap.teleportTarget;
+    }
+
+    // Find player and exit positions
+    let foundPlayer = false, foundExit = false;
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (finalMap[y][x] === '@') {
+          playerX = x;
+          playerY = y;
+          finalMap[y][x] = '.';
+          foundPlayer = true;
+        }
+        if (finalMap[y][x] === '\u2605') {
+          exitX = x;
+          exitY = y;
+          foundExit = true;
+        }
+        if (finalMap[y][x] === 'E') {
+          // If enemies not in list, add static ones
+          let alreadyTracked = newEnemies.some(e => e.x === x && e.y === y);
+          if (!alreadyTracked) {
+            newEnemies.push({ x, y, speed: 0, dir: 1, minX: 1, maxX: COLS-2 });
+          }
+        }
+      }
+    }
+
+    if (!foundPlayer) {
+      playerX = levels[currentLevel].playerStart[0];
+      playerY = levels[currentLevel].playerStart[1];
+    }
+    if (!foundExit) {
+      exitX = levels[currentLevel].exitPos[0];
+      exitY = levels[currentLevel].exitPos[1];
+      finalMap[exitY][exitX] = '\u2605';
+    }
+
+    map = finalMap;
+    if (teleportTarget) map.teleportTarget = teleportTarget;
+    enemies = newEnemies;
+
+    // Start enemy movement
+    if (enemies.some(e => e.speed > 0)) {
+      startEnemyMovement();
+    }
+
+    renderMap();
+    statusEl.textContent = '\u2713 \u6267\u884c\u6210\u529f';
+    statusEl.style.color = '#00ff41';
+    msgBar.innerHTML = '&gt; \u4ee3\u7801\u5df2\u6267\u884c\u3002\u7528\u65b9\u5411\u952e\u79fb\u52a8\u5230 \u2605 \u51fa\u53e3\u3002';
+    msgBar.style.color = '#00ff41';
+
+    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+
+  } catch (err) {
+    statusEl.textContent = '\u2717 \u6267\u884c\u5931\u8d25';
+    statusEl.style.color = '#ff4444';
+    msgBar.innerHTML = '&gt; \u9519\u8bef\uff1a' + escapeHtml(err.message);
+    msgBar.style.color = '#ff4444';
+  }
+}
+
+
+// ----- Enemy Movement -----
+function startEnemyMovement() {
+  if (enemyInterval) clearInterval(enemyInterval);
+  enemyInterval = setInterval(() => {
+    if (!gameActive) return;
+    enemies.forEach(enemy => {
+      if (enemy.speed <= 0) return;
+
+      // Clear old position
+      if (map[enemy.y] && map[enemy.y][enemy.x] === 'E') {
+        map[enemy.y][enemy.x] = '.';
+      }
+
+      // Move
+      enemy.x += enemy.dir * enemy.speed;
+      if (enemy.x >= enemy.maxX) { enemy.x = enemy.maxX; enemy.dir = -1; }
+      if (enemy.x <= enemy.minX) { enemy.x = enemy.minX; enemy.dir = 1; }
+
+      // Check collision with player
+      if (enemy.x === playerX && enemy.y === playerY) {
+        showMessage('\u88ab\u654c\u4eba\u6293\u4f4f\u4e86\uff01\u91cd\u7f6e\u4e2d...', '#ff4444');
+        resetPlayerPosition();
+      }
+
+      // Place at new position
+      if (map[enemy.y] && map[enemy.y][enemy.x] !== '#' && map[enemy.y][enemy.x] !== '\u2605') {
+        map[enemy.y][enemy.x] = 'E';
+      }
+    });
+    renderMap();
+  }, 500);
+}
+
+
+// ----- Player Movement -----
+function movePlayer(dx, dy) {
+  if (!gameActive) return;
+
+  const newX = playerX + dx;
+  const newY = playerY + dy;
+
+  // Bounds check
+  if (newX < 0 || newX >= COLS || newY < 0 || newY >= ROWS) return;
+
+  const tile = map[newY][newX];
+
+  // Wall check
+  if (tile === '#') return;
+
+  // Door check
+  if (tile === 'D') {
+    if (hasKey) {
+      hasKey = false;
+      map[newY][newX] = '.';
+      showMessage('\u7528\u94a5\u5319\u6253\u5f00\u4e86\u95e8\uff01', '#ffd700');
+    } else {
+      showMessage('\u9700\u8981\u94a5\u5319\u624d\u80fd\u6253\u5f00\u8fd9\u6247\u95e8\u3002', '#ff8800');
+      return;
+    }
+  }
+
+  // Gap check
+  if (tile === '~') {
+    showMessage('\u6389\u5165\u4e86\u6df1\u6e0a\uff01\u91cd\u7f6e\u4e2d...', '#ff4444');
+    resetPlayerPosition();
+    return;
+  }
+
+  // Trap check
+  if (tile === '^') {
+    showMessage('\u8e29\u5230\u9677\u9631\u4e86\uff01\u91cd\u7f6e\u4e2d...', '#ff4444');
+    resetPlayerPosition();
+    return;
+  }
+
+  // Enemy check
+  if (tile === 'E') {
+    showMessage('\u88ab\u654c\u4eba\u6293\u4f4f\u4e86\uff01\u91cd\u7f6e\u4e2d...', '#ff4444');
+    resetPlayerPosition();
+    return;
+  }
+
+  // Key pickup
+  if (tile === '\u2666') {
+    hasKey = true;
+    map[newY][newX] = '.';
+    showMessage('\u83b7\u5f97\u94a5\u5319\uff01', '#ff00ff');
+  }
+
+  // Teleport
+  if (tile === 'O') {
+    if (map.teleportTarget) {
+      const tx = map.teleportTarget.x;
+      const ty = map.teleportTarget.y;
+      if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS && map[ty][tx] !== '#') {
+        playerX = tx;
+        playerY = ty;
+        showMessage('\u4f20\u9001\u6210\u529f\uff01', '#cc66ff');
+        renderMap();
+        return;
+      } else {
+        showMessage('\u4f20\u9001\u76ee\u6807\u65e0\u6548\uff01', '#ff4444');
+        return;
+      }
+    }
+  }
+
+  // Move
+  playerX = newX;
+  playerY = newY;
+
+  // Win check
+  if (playerX === exitX && playerY === exitY) {
+    gameActive = false;
+    renderMap();
+    setTimeout(() => showLevelComplete(), 300);
+    return;
+  }
+
+  renderMap();
+}
+
+function resetPlayerPosition() {
+  playerX = levels[currentLevel].playerStart[0];
+  playerY = levels[currentLevel].playerStart[1];
+  renderMap();
+}
+
+
+// ----- Level Management -----
+function loadLevel(idx) {
+  if (idx >= levels.length) {
+    showGameComplete();
+    return;
+  }
+
+  currentLevel = idx;
+  const level = levels[idx];
+  gameActive = true;
+  hasKey = false;
+
+  if (enemyInterval) {
+    clearInterval(enemyInterval);
+    enemyInterval = null;
+  }
+  enemies = [];
+
+  // Update UI
+  document.getElementById('level-info').textContent =
+    '\u7b2c ' + (idx + 1) + ' \u5173 / \u5171 ' + levels.length + ' \u5173 \u2014 ' + level.name;
+  document.getElementById('map-header').textContent =
+    '// ' + level.description;
+
+  // Load code
+  loadCodeForLevel(idx);
+
+  // Execute the default code to show initial map
+  executeCode();
+
+  showMessage(level.description, '#ffcc00');
+
+  // Focus handling
+  document.getElementById('code-editor').focus();
+}
+
+function resetLevel() {
+  loadCodeForLevel(currentLevel);
+  executeCode();
+  showMessage('\u4ee3\u7801\u5df2\u91cd\u7f6e\u3002', '#00ccff');
+}
+
+
+// ----- UI Helpers -----
+function showMessage(msg, color) {
+  const bar = document.getElementById('message-bar');
+  bar.innerHTML = '&gt; ' + escapeHtml(msg);
+  bar.style.color = color || '#ffcc00';
+}
+
+function showLevelComplete() {
+  const overlay = document.getElementById('modal-overlay');
+  const title = document.getElementById('modal-title');
+  const text = document.getElementById('modal-text');
+  const btn = document.getElementById('modal-btn');
+
+  if (currentLevel < levels.length - 1) {
+    title.textContent = '\u5173\u5361\u5b8c\u6210\uff01';
+    text.textContent = '\u4f60\u6210\u529f\u4fee\u6539\u4e86\u4ee3\u7801\u5e76\u5230\u8fbe\u4e86\u51fa\u53e3\u3002\u51c6\u5907\u8fce\u63a5\u4e0b\u4e00\u4e2a\u6311\u6218\uff01';
+    btn.textContent = '[ \u4e0b\u4e00\u5173 ]';
+    btn.onclick = function() {
+      overlay.classList.remove('active');
+      loadLevel(currentLevel + 1);
+    };
+  } else {
+    title.textContent = '\u606d\u559c\u901a\u5173\uff01';
+    text.textContent = '\u4f60\u5df2\u7ecf\u5b8c\u6210\u4e86\u6240\u6709\u5173\u5361\uff01\u4f60\u662f\u771f\u6b63\u7684\u4ee3\u7801\u9ed1\u5ba2\u3002';
+    btn.textContent = '[ \u518d\u6765\u4e00\u6b21 ]';
+    btn.onclick = function() {
+      overlay.classList.remove('active');
+      loadLevel(0);
+    };
+  }
+
+  overlay.classList.add('active');
+}
+
+function showGameComplete() {
+  const overlay = document.getElementById('modal-overlay');
+  const title = document.getElementById('modal-title');
+  const text = document.getElementById('modal-text');
+  const btn = document.getElementById('modal-btn');
+
+  title.textContent = '\u606d\u559c\u901a\u5173\uff01';
+  text.textContent = '\u4f60\u5df2\u7ecf\u7a81\u7834\u4e86\u6240\u6709\u4e0d\u53ef\u4fe1\u7684\u4ee3\u7801\uff01\u4f60\u662f\u771f\u6b63\u7684\u4ee3\u7801\u9ed1\u5ba2\u3002';
+  btn.textContent = '[ \u4ece\u5934\u5f00\u59cb ]';
+  btn.onclick = function() {
+    overlay.classList.remove('active');
+    loadLevel(0);
+  };
+
+  overlay.classList.add('active');
+}
+
+function showHint() {
+  const level = levels[currentLevel];
+  showMessage('\ud83d\udca1 ' + level.hint, '#ffcc00');
+}
+
+
+// ----- Event Handlers -----
+function setupEvents() {
+  // Arrow key movement
+  document.addEventListener('keydown', function(e) {
+    // Don't intercept if typing in the editor
+    if (document.activeElement === document.getElementById('code-editor')) {
+      // But still allow Ctrl+Enter to execute
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        executeCode();
+      }
+      return;
+    }
+
+    if (!gameActive) return;
+
+    switch(e.key) {
+      case 'ArrowUp':
+      case 'w':
+      case 'W':
+        e.preventDefault();
+        movePlayer(0, -1);
+        break;
+      case 'ArrowDown':
+      case 's':
+      case 'S':
+        e.preventDefault();
+        movePlayer(0, 1);
+        break;
+      case 'ArrowLeft':
+      case 'a':
+      case 'A':
+        e.preventDefault();
+        movePlayer(-1, 0);
+        break;
+      case 'ArrowRight':
+      case 'd':
+      case 'D':
+        e.preventDefault();
+        movePlayer(1, 0);
+        break;
+    }
+  });
+
+  // Code editor input
+  const editor = document.getElementById('code-editor');
+  editor.addEventListener('input', function() {
+    enforceLockedRegions();
+  });
+
+  editor.addEventListener('keydown', function(e) {
+    // Handle Tab key for indentation
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = this.selectionStart;
+      const end = this.selectionEnd;
+      const range = getEditableRange(currentLevel);
+      const level = levels[currentLevel];
+      const maxEnd = this.value.length - level.lockedSuffix.length;
+
+      if (start >= range.start && end <= maxEnd) {
+        this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 2;
+        enforceLockedRegions();
+      }
+    }
+
+    // Ctrl+Enter to execute
+    if (e.ctrlKey && e.key === 'Enter') {
+      e.preventDefault();
+      executeCode();
+    }
+  });
+
+  // Prevent editing outside editable zone with selection
+  editor.addEventListener('beforeinput', function(e) {
+    const range = getEditableRange(currentLevel);
+    const level = levels[currentLevel];
+    const maxEnd = this.value.length - level.lockedSuffix.length;
+    const start = this.selectionStart;
+    const end = this.selectionEnd;
+
+    // If trying to edit locked region, prevent
+    if (start < range.start || end > maxEnd) {
+      // Allow if selection is partially in editable zone
+      if (start < range.start && end <= range.start) {
+        e.preventDefault();
+        showMessage('\u8be5\u533a\u57df\u4ee3\u7801\u5df2\u9501\u5b9a\uff0c\u4e0d\u53ef\u4fee\u6539\u3002', '#ff4444');
+        return;
+      }
+      if (start >= maxEnd) {
+        e.preventDefault();
+        showMessage('\u8be5\u533a\u57df\u4ee3\u7801\u5df2\u9501\u5b9a\uff0c\u4e0d\u53ef\u4fee\u6539\u3002', '#ff4444');
+        return;
+      }
+    }
+  });
+
+  editor.addEventListener('scroll', function() {
+    const highlight = document.getElementById('code-highlight');
+    const lineNumbers = document.getElementById('line-numbers');
+    highlight.scrollTop = this.scrollTop;
+    highlight.scrollLeft = this.scrollLeft;
+    lineNumbers.style.top = -this.scrollTop + 'px';
+  });
+
+  // Buttons
+  document.getElementById('btn-execute').addEventListener('click', executeCode);
+  document.getElementById('btn-reset').addEventListener('click', resetLevel);
+  document.getElementById('btn-hint').addEventListener('click', showHint);
+
+  document.getElementById('btn-help').addEventListener('click', function() {
+    document.getElementById('instruction-overlay').classList.add('active');
+  });
+
+  document.getElementById('close-help').addEventListener('click', function() {
+    document.getElementById('instruction-overlay').classList.remove('active');
+  });
+
+  // Click on map panel to focus for movement
+  document.getElementById('map-panel').addEventListener('click', function(e) {
+    if (e.target.tagName !== 'TEXTAREA') {
+      document.getElementById('code-editor').blur();
+    }
+  });
+
+  // Modal keyboard handling
+  document.addEventListener('keydown', function(e) {
+    if (document.getElementById('modal-overlay').classList.contains('active')) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        document.getElementById('modal-btn').click();
+      }
+    }
+    if (document.getElementById('instruction-overlay').classList.contains('active')) {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        document.getElementById('instruction-overlay').classList.remove('active');
+      }
+    }
+  });
+}
+
+
+// ----- Initialize -----
+function init() {
+  setupEvents();
+  bootSequence();
+}
+
+// Start
+init();
+
+})();
+</script>
+</body>
+</html>

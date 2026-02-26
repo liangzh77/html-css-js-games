@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方块作曲家 - 函数式编程解谜</title>
+<style>
+/* ========== RESET & BASE ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  background: #f0f2f5;
+  color: #333;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ========== COLORS ========== */
+:root {
+  --red: #e74c3c;
+  --red-dark: #c0392b;
+  --red-light: #ff6b6b;
+  --blue: #3498db;
+  --blue-dark: #2176ae;
+  --blue-light: #5dade2;
+  --yellow: #f1c40f;
+  --yellow-dark: #d4a90a;
+  --yellow-light: #f9e154;
+  --green: #2ecc71;
+  --green-dark: #1ea85a;
+  --green-light: #58d68d;
+  --orange: #e67e22;
+  --orange-dark: #c56a15;
+  --orange-light: #f0a04b;
+  --purple: #9b59b6;
+  --purple-dark: #7d3c98;
+  --purple-light: #bb8fce;
+  --empty: transparent;
+}
+
+/* ========== SCREEN MANAGEMENT ========== */
+.screen { display: none; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+
+/* ========== TITLE SCREEN ========== */
+#title-screen {
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+#title-screen h1 {
+  font-size: 3.5rem;
+  font-weight: 800;
+  letter-spacing: 4px;
+  margin-bottom: 12px;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+#title-screen .subtitle {
+  font-size: 1.15rem;
+  opacity: 0.9;
+  margin-bottom: 40px;
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.8;
+}
+#title-screen .start-btn {
+  padding: 16px 48px;
+  font-size: 1.3rem;
+  background: #fff;
+  color: #764ba2;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+}
+#title-screen .start-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 32px rgba(0,0,0,0.3);
+}
+.demo-cubes {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 36px;
+}
+.demo-cube {
+  width: 50px; height: 50px;
+  border-radius: 10px;
+  animation: float 3s ease-in-out infinite;
+}
+.demo-cube:nth-child(1) { background: var(--red); animation-delay: 0s; }
+.demo-cube:nth-child(2) { background: var(--blue); animation-delay: 0.3s; }
+.demo-cube:nth-child(3) { background: var(--yellow); animation-delay: 0.6s; }
+.demo-cube:nth-child(4) { background: var(--green); animation-delay: 0.9s; }
+.demo-cube:nth-child(5) { background: var(--purple); animation-delay: 1.2s; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+/* ========== LEVEL SELECT ========== */
+#level-screen {
+  min-height: 100vh;
+  padding: 40px 20px;
+  background: #f0f2f5;
+}
+#level-screen h2 {
+  font-size: 2rem;
+  color: #444;
+  margin-bottom: 12px;
+}
+#level-screen .level-subtitle {
+  color: #888;
+  margin-bottom: 32px;
+  font-size: 0.95rem;
+}
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  max-width: 700px;
+  width: 100%;
+}
+.level-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border: 2px solid transparent;
+  position: relative;
+}
+.level-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.level-card.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.level-card.completed {
+  border-color: var(--green);
+}
+.level-card .level-num {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #764ba2;
+}
+.level-card .level-name {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 6px;
+}
+.level-card .check-mark {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: var(--green);
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+.back-btn {
+  margin-top: 32px;
+  padding: 10px 28px;
+  background: #764ba2;
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.2s;
+}
+.back-btn:hover { background: #5e3a82; }
+
+/* ========== GAME SCREEN ========== */
+#game-screen {
+  min-height: 100vh;
+  padding: 20px;
+  background: #f0f2f5;
+}
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1100px;
+  margin-bottom: 20px;
+}
+.game-header h2 {
+  font-size: 1.5rem;
+  color: #444;
+}
+.game-header .header-btns {
+  display: flex;
+  gap: 10px;
+}
+.game-header button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-back-level { background: #ddd; color: #555; }
+.btn-back-level:hover { background: #ccc; }
+.btn-reset { background: #e74c3c; color: #fff; }
+.btn-reset:hover { background: #c0392b; }
+
+.game-body {
+  display: flex;
+  gap: 32px;
+  max-width: 1100px;
+  width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ========== GRID DISPLAY ========== */
+.grid-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.grid-section h3 {
+  font-size: 1rem;
+  color: #888;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+.grid-container {
+  perspective: 600px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 200px;
+  min-height: 200px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+}
+.iso-grid {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  transform: rotateX(15deg) rotateY(-15deg);
+  transform-style: preserve-3d;
+}
+.iso-column {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 4px;
+}
+
+/* ========== 3D CUBE ========== */
+.cube-wrap {
+  width: 40px;
+  height: 40px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: all 0.4s ease;
+}
+.cube-wrap.entering {
+  animation: cubeEnter 0.4s ease forwards;
+}
+.cube-wrap.exiting {
+  animation: cubeExit 0.3s ease forwards;
+}
+@keyframes cubeEnter {
+  0% { transform: scale(0) rotateY(90deg); opacity: 0; }
+  100% { transform: scale(1) rotateY(0); opacity: 1; }
+}
+@keyframes cubeExit {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0) rotateY(-90deg); opacity: 0; }
+}
+.cube-face {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+}
+.cube-top {
+  transform: rotateX(90deg) translateZ(20px);
+}
+.cube-front {
+  transform: translateZ(20px);
+}
+.cube-right {
+  transform: rotateY(90deg) translateZ(20px);
+}
+
+/* Cube colors */
+.cube-red .cube-front { background: var(--red); }
+.cube-red .cube-top { background: var(--red-light); }
+.cube-red .cube-right { background: var(--red-dark); }
+
+.cube-blue .cube-front { background: var(--blue); }
+.cube-blue .cube-top { background: var(--blue-light); }
+.cube-blue .cube-right { background: var(--blue-dark); }
+
+.cube-yellow .cube-front { background: var(--yellow); }
+.cube-yellow .cube-top { background: var(--yellow-light); }
+.cube-yellow .cube-right { background: var(--yellow-dark); }
+
+.cube-green .cube-front { background: var(--green); }
+.cube-green .cube-top { background: var(--green-light); }
+.cube-green .cube-right { background: var(--green-dark); }
+
+.cube-orange .cube-front { background: var(--orange); }
+.cube-orange .cube-top { background: var(--orange-light); }
+.cube-orange .cube-right { background: var(--orange-dark); }
+
+.cube-purple .cube-front { background: var(--purple); }
+.cube-purple .cube-top { background: var(--purple-light); }
+.cube-purple .cube-right { background: var(--purple-dark); }
+
+/* ========== FUNCTION PANEL ========== */
+.function-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 280px;
+}
+.available-functions h3,
+.pipeline-section h3 {
+  font-size: 1rem;
+  color: #888;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.func-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.func-btn {
+  padding: 10px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.func-btn:hover {
+  border-color: #764ba2;
+  color: #764ba2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(118,75,162,0.15);
+}
+.func-btn .func-icon {
+  font-size: 1rem;
+}
+.func-btn.locked {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Color selector dropdown */
+.color-selector {
+  position: absolute;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  padding: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  z-index: 100;
+  max-width: 200px;
+}
+.color-selector.hidden { display: none; }
+.color-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.15s;
+  border: 3px solid transparent;
+}
+.color-dot:hover {
+  transform: scale(1.2);
+  border-color: #333;
+}
+/* secondary color row for map */
+.color-selector .arrow-label {
+  width: 100%;
+  text-align: center;
+  font-size: 1.2rem;
+  color: #aaa;
+  margin: 2px 0;
+}
+
+/* ========== PIPELINE ========== */
+.pipeline-section {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  min-height: 140px;
+}
+.pipeline-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 50px;
+  padding: 10px;
+  border: 2px dashed #e0e0e0;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+.pipeline-steps.drag-over {
+  border-color: #764ba2;
+  background: rgba(118,75,162,0.04);
+}
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  animation: stepIn 0.25s ease;
+}
+@keyframes stepIn {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pipeline-step:hover { transform: scale(1.05); }
+.pipeline-step .remove-step {
+  margin-left: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.pipeline-step .remove-step:hover {
+  background: rgba(255,255,255,0.6);
+}
+.step-color-preview {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.6);
+  display: inline-block;
+}
+.pipeline-arrow {
+  color: #bbb;
+  font-size: 1.1rem;
+  user-select: none;
+}
+
+.pipeline-actions {
+  display: flex;
+  gap: 10px;
+}
+.btn-execute {
+  flex: 1;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-execute:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(118,75,162,0.3);
+}
+.btn-execute:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.btn-clear-pipeline {
+  padding: 12px 20px;
+  background: #eee;
+  color: #888;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-clear-pipeline:hover { background: #ddd; }
+
+/* ========== LEVEL HINT ========== */
+.level-hint {
+  max-width: 1100px;
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px 24px;
+  margin-top: 20px;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+.level-hint strong { color: #764ba2; }
+
+/* ========== SUCCESS OVERLAY ========== */
+.success-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.success-overlay.show {
+  opacity: 1;
+  pointer-events: all;
+}
+.success-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 48px;
+  text-align: center;
+  transform: scale(0.8);
+  transition: transform 0.3s;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  max-width: 400px;
+}
+.success-overlay.show .success-card {
+  transform: scale(1);
+}
+.success-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+  animation: successBounce 0.6s ease;
+}
+@keyframes successBounce {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.3); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.success-card h2 {
+  font-size: 1.8rem;
+  color: #333;
+  margin-bottom: 8px;
+}
+.success-card p {
+  color: #888;
+  margin-bottom: 24px;
+}
+.success-card button {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 30px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin: 0 6px;
+}
+.btn-next-level {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+}
+.btn-next-level:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(118,75,162,0.3);
+}
+.btn-back-to-levels {
+  background: #eee;
+  color: #666;
+}
+.btn-back-to-levels:hover { background: #ddd; }
+
+/* ========== CONFETTI ========== */
+.confetti-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1001;
+  overflow: hidden;
+}
+.confetti-piece {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  top: -20px;
+  animation: confettiFall linear forwards;
+}
+@keyframes confettiFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+/* ========== EXECUTING ANIMATION ========== */
+.executing-indicator {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: 30px;
+  font-weight: 700;
+  z-index: 500;
+  box-shadow: 0 6px 24px rgba(118,75,162,0.3);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.executing-indicator.show { opacity: 1; }
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 800px) {
+  .game-body { flex-direction: column; align-items: center; }
+  .function-panel { min-width: auto; width: 100%; max-width: 400px; }
+  #title-screen h1 { font-size: 2.4rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== TITLE SCREEN ========== -->
+<div id="title-screen" class="screen active">
+  <div class="demo-cubes">
+    <div class="demo-cube"></div>
+    <div class="demo-cube"></div>
+    <div class="demo-cube"></div>
+    <div class="demo-cube"></div>
+    <div class="demo-cube"></div>
+  </div>
+  <h1>方块作曲家</h1>
+  <p class="subtitle">
+    用函数式编程的思维来解谜！<br>
+    通过组合不同的函数变换，将方块从初始状态转化为目标图案。<br>
+    像作曲一样，用 <strong>映射</strong>、<strong>过滤</strong>、<strong>堆叠</strong>、<strong>翻转</strong> 和 <strong>旋转</strong> 函数，创造出美妙的方块乐章。
+  </p>
+  <button class="start-btn" onclick="showScreen('level-screen')">开始游戏</button>
+</div>
+
+<!-- ========== LEVEL SELECT ========== -->
+<div id="level-screen" class="screen">
+  <h2>选择关卡</h2>
+  <p class="level-subtitle">逐步解锁更多函数，挑战更复杂的谜题</p>
+  <div class="level-grid" id="level-grid"></div>
+  <button class="back-btn" onclick="showScreen('title-screen')">返回主菜单</button>
+</div>
+
+<!-- ========== GAME SCREEN ========== -->
+<div id="game-screen" class="screen">
+  <div class="game-header">
+    <h2 id="game-title">第 1 关</h2>
+    <div class="header-btns">
+      <button class="btn-back-level" onclick="showScreen('level-screen')">关卡列表</button>
+      <button class="btn-reset" onclick="resetLevel()">重置</button>
+    </div>
+  </div>
+
+  <div class="game-body">
+    <!-- Current State -->
+    <div class="grid-section">
+      <h3>当前状态</h3>
+      <div class="grid-container">
+        <div class="iso-grid" id="current-grid"></div>
+      </div>
+    </div>
+
+    <!-- Target State -->
+    <div class="grid-section">
+      <h3>目标图案</h3>
+      <div class="grid-container">
+        <div class="iso-grid" id="target-grid"></div>
+      </div>
+    </div>
+
+    <!-- Function Panel -->
+    <div class="function-panel">
+      <div class="available-functions">
+        <h3>可用函数</h3>
+        <div class="func-list" id="func-list"></div>
+      </div>
+      <div class="pipeline-section">
+        <h3>函数管道</h3>
+        <div class="pipeline-steps" id="pipeline-steps">
+          <span style="color:#bbb;font-size:0.85rem;">点击上方函数添加到管道中...</span>
+        </div>
+        <div class="pipeline-actions">
+          <button class="btn-execute" id="btn-execute" onclick="executePipeline()">执行管道</button>
+          <button class="btn-clear-pipeline" onclick="clearPipeline()">清空</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="level-hint" id="level-hint"></div>
+</div>
+
+<!-- ========== SUCCESS OVERLAY ========== -->
+<div class="success-overlay" id="success-overlay">
+  <div class="success-card">
+    <div class="success-icon">&#10004;</div>
+    <h2>太棒了！</h2>
+    <p id="success-msg">你成功完成了这个关卡！</p>
+    <div>
+      <button class="btn-back-to-levels" onclick="closeSuccess(); showScreen('level-screen');">关卡列表</button>
+      <button class="btn-next-level" id="btn-next" onclick="nextLevel()">下一关</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== CONFETTI CONTAINER ========== -->
+<div class="confetti-container" id="confetti-container"></div>
+
+<!-- ========== EXECUTING INDICATOR ========== -->
+<div class="executing-indicator" id="exec-indicator">正在执行函数管道...</div>
+
+<!-- ========== COLOR SELECTOR (reusable) ========== -->
+<div class="color-selector hidden" id="color-selector"></div>
+
+<script>
+/* =====================================================
+   方块作曲家 - Cube Composer
+   A functional programming puzzle game
+   ===================================================== */
+
+// ============ CONSTANTS ============
+const COLORS = ['red', 'blue', 'yellow', 'green', 'orange', 'purple'];
+const COLOR_NAMES = {
+  red: '红色', blue: '蓝色', yellow: '黄色',
+  green: '绿色', orange: '橙色', purple: '紫色'
+};
+const COLOR_HEX = {
+  red: '#e74c3c', blue: '#3498db', yellow: '#f1c40f',
+  green: '#2ecc71', orange: '#e67e22', purple: '#9b59b6'
+};
+
+// ============ GAME STATE ============
+let currentLevel = 0;
+let currentGrid = [];     // 2D array: columns of cubes (bottom to top)
+let pipeline = [];         // Array of {type, params}
+let completedLevels = new Set();
+let isExecuting = false;
+
+// Load progress
+try {
+  const saved = JSON.parse(localStorage.getItem('cubeComposerProgress') || '[]');
+  completedLevels = new Set(saved);
+} catch(e) {}
+
+// ============ LEVEL DEFINITIONS ============
+// Grid format: array of columns, each column is bottom-to-top array of colors
+// Available functions per level unlock progressively
+const LEVELS = [
+  {
+    name: '初识映射',
+    hint: '<strong>map(颜色A, 颜色B)</strong> 函数会将网格中所有颜色A的方块变为颜色B。这是函数式编程中最基本的"映射"操作，它将一种值转换为另一种值。试试把所有红色方块变成蓝色！',
+    initial: [['red'], ['red'], ['red']],
+    target:  [['blue'], ['blue'], ['blue']],
+    available: ['map'],
+    colors: ['red', 'blue']
+  },
+  {
+    name: '过滤之道',
+    hint: '<strong>filter(颜色)</strong> 函数会移除所有指定颜色的方块，就像函数式编程中的过滤器一样——只保留满足条件的元素。移除蓝色方块，只留下红色！',
+    initial: [['red', 'blue'], ['blue', 'red'], ['red', 'blue']],
+    target:  [['red'], ['red'], ['red']],
+    available: ['map', 'filter'],
+    colors: ['red', 'blue']
+  },
+  {
+    name: '组合变换',
+    hint: '函数式编程的精髓在于<strong>组合</strong>——将多个简单函数串联起来，形成强大的变换管道。先映射，再过滤，或者先过滤再映射，顺序不同结果也不同！试试先过滤掉不需要的颜色，再用映射改变剩下的方块。',
+    initial: [['red', 'blue'], ['green', 'blue'], ['red', 'blue']],
+    target:  [['yellow'], ['yellow'], ['yellow']],
+    available: ['map', 'filter'],
+    colors: ['red', 'blue', 'green', 'yellow']
+  },
+  {
+    name: '堆叠方块',
+    hint: '<strong>stack</strong> 函数会将所有方块向下压缩堆叠，消除列之间的空隙。这类似于函数式编程中的"compact"或"flatten"操作，把分散的数据紧凑在一起。',
+    initial: [['red'], ['blue'], ['red'], ['blue']],
+    target:  [['red', 'blue'], ['red', 'blue']],
+    available: ['map', 'filter', 'stack'],
+    colors: ['red', 'blue']
+  },
+  {
+    name: '翻转世界',
+    hint: '<strong>reverse</strong> 函数会将每一列中方块的顺序翻转——底部变顶部，顶部变底部。在函数式编程中，列表翻转是一个经典的操作。和其他函数组合使用，可以创造有趣的效果！',
+    initial: [['red', 'blue'], ['green', 'yellow'], ['red', 'blue']],
+    target:  [['blue', 'red'], ['yellow', 'green'], ['blue', 'red']],
+    available: ['map', 'filter', 'stack', 'reverse'],
+    colors: ['red', 'blue', 'green', 'yellow']
+  },
+  {
+    name: '旋转乾坤',
+    hint: '<strong>rotate</strong> 函数将整个网格顺时针旋转90度。行变成列，列变成行。这是一种矩阵变换操作。结合其他函数，你可以实现许多看似不可能的变换！',
+    initial: [['red', 'blue'], ['green', 'yellow']],
+    target:  [['green', 'red'], ['yellow', 'blue']],
+    available: ['map', 'filter', 'stack', 'reverse', 'rotate'],
+    colors: ['red', 'blue', 'green', 'yellow']
+  },
+  {
+    name: '管道大师',
+    hint: '现在你已经掌握了所有基本函数！试着运用你学到的组合技巧，用尽可能少的步骤完成这个挑战。记住：函数的执行顺序至关重要！',
+    initial: [['red', 'blue', 'green'], ['blue', 'green', 'red'], ['green', 'red', 'blue']],
+    target:  [['yellow', 'yellow', 'yellow'], ['yellow', 'yellow', 'yellow'], ['yellow', 'yellow', 'yellow']],
+    available: ['map', 'filter', 'stack', 'reverse', 'rotate'],
+    colors: ['red', 'blue', 'green', 'yellow']
+  },
+  {
+    name: '终极挑战',
+    hint: '这是最后的挑战！综合运用所有函数，仔细观察初始状态和目标状态的差异，规划出正确的变换路径。你可以做到的！',
+    initial: [['orange', 'purple', 'red'], ['purple', 'red', 'orange'], ['orange', 'purple', 'red']],
+    target:  [['blue', 'green'], ['green', 'blue'], ['blue', 'green']],
+    available: ['map', 'filter', 'stack', 'reverse', 'rotate'],
+    colors: ['red', 'blue', 'green', 'orange', 'purple']
+  }
+];
+
+// ============ SCREEN NAVIGATION ============
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'level-screen') renderLevelSelect();
+}
+
+// ============ LEVEL SELECT ============
+function renderLevelSelect() {
+  const grid = document.getElementById('level-grid');
+  grid.innerHTML = '';
+  LEVELS.forEach((lvl, i) => {
+    const card = document.createElement('div');
+    card.className = 'level-card';
+    const unlocked = i === 0 || completedLevels.has(i - 1);
+    if (!unlocked) card.classList.add('locked');
+    if (completedLevels.has(i)) card.classList.add('completed');
+    card.innerHTML = `
+      <div class="level-num">${i + 1}</div>
+      <div class="level-name">${lvl.name}</div>
+      ${completedLevels.has(i) ? '<div class="check-mark">&#10003;</div>' : ''}
+    `;
+    if (unlocked) card.onclick = () => startLevel(i);
+    grid.appendChild(card);
+  });
+}
+
+// ============ START LEVEL ============
+function startLevel(index) {
+  currentLevel = index;
+  const lvl = LEVELS[index];
+  // Deep copy initial grid
+  currentGrid = lvl.initial.map(col => [...col]);
+  pipeline = [];
+  isExecuting = false;
+
+  document.getElementById('game-title').textContent = `第 ${index + 1} 关 - ${lvl.name}`;
+  document.getElementById('level-hint').innerHTML = lvl.hint;
+
+  renderGrid('current-grid', currentGrid);
+  renderGrid('target-grid', lvl.target);
+  renderFuncList();
+  renderPipeline();
+  showScreen('game-screen');
+}
+
+// ============ GRID RENDERING ============
+function renderGrid(containerId, grid, animate) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  // Determine max column height for sizing
+  const maxH = Math.max(1, ...grid.map(c => c.length));
+
+  grid.forEach((col, ci) => {
+    const colDiv = document.createElement('div');
+    colDiv.className = 'iso-column';
+    col.forEach((color, ri) => {
+      const wrap = document.createElement('div');
+      wrap.className = `cube-wrap cube-${color}`;
+      if (animate) {
+        wrap.classList.add('entering');
+        wrap.style.animationDelay = `${(ci * col.length + ri) * 0.06}s`;
+      }
+      wrap.innerHTML = `
+        <div class="cube-face cube-top"></div>
+        <div class="cube-face cube-front"></div>
+        <div class="cube-face cube-right"></div>
+      `;
+      colDiv.appendChild(wrap);
+    });
+    container.appendChild(colDiv);
+  });
+}
+
+// ============ FUNCTION LIST ============
+function renderFuncList() {
+  const lvl = LEVELS[currentLevel];
+  const list = document.getElementById('func-list');
+  list.innerHTML = '';
+
+  const allFuncs = [
+    { type: 'map', label: 'map(A, B)', icon: 'f', desc: '映射' },
+    { type: 'filter', label: 'filter(A)', icon: 'f', desc: '过滤' },
+    { type: 'stack', label: 'stack', icon: 'f', desc: '堆叠' },
+    { type: 'reverse', label: 'reverse', icon: 'f', desc: '翻转' },
+    { type: 'rotate', label: 'rotate', icon: 'f', desc: '旋转' }
+  ];
+
+  allFuncs.forEach(fn => {
+    const btn = document.createElement('button');
+    btn.className = 'func-btn';
+    const isAvailable = lvl.available.includes(fn.type);
+    if (!isAvailable) btn.classList.add('locked');
+    btn.innerHTML = `<span class="func-icon">f</span> ${fn.desc} <span style="color:#aaa;font-size:0.75rem;">${fn.label}</span>`;
+    if (isAvailable) {
+      btn.onclick = (e) => onFuncClick(fn.type, e);
+    }
+    list.appendChild(btn);
+  });
+}
+
+// ============ FUNCTION CLICK HANDLER ============
+function onFuncClick(type, event) {
+  if (isExecuting) return;
+  const lvl = LEVELS[currentLevel];
+  if (type === 'map') {
+    showColorSelector(event, 'map-from', (fromColor) => {
+      showColorSelector(event, 'map-to', (toColor) => {
+        pipeline.push({ type: 'map', params: { from: fromColor, to: toColor }});
+        renderPipeline();
+      }, '选择目标颜色');
+    }, '选择源颜色');
+  } else if (type === 'filter') {
+    showColorSelector(event, 'filter', (color) => {
+      pipeline.push({ type: 'filter', params: { color }});
+      renderPipeline();
+    }, '选择要移除的颜色');
+  } else {
+    pipeline.push({ type, params: {} });
+    renderPipeline();
+  }
+}
+
+// ============ COLOR SELECTOR ============
+function showColorSelector(event, mode, callback, title) {
+  const sel = document.getElementById('color-selector');
+  const lvl = LEVELS[currentLevel];
+  sel.innerHTML = '';
+  if (title) {
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'width:100%;text-align:center;font-size:0.8rem;color:#888;margin-bottom:4px;';
+    lbl.textContent = title;
+    sel.appendChild(lbl);
+  }
+  lvl.colors.forEach(c => {
+    const dot = document.createElement('div');
+    dot.className = 'color-dot';
+    dot.style.background = COLOR_HEX[c];
+    dot.onclick = () => {
+      sel.classList.add('hidden');
+      callback(c);
+    };
+    sel.appendChild(dot);
+  });
+  // Position near the click
+  const rect = event.target.closest('.func-btn').getBoundingClientRect();
+  sel.style.top = (rect.bottom + 8) + 'px';
+  sel.style.left = rect.left + 'px';
+  sel.classList.remove('hidden');
+
+  // Close on outside click
+  setTimeout(() => {
+    const closer = (e) => {
+      if (!sel.contains(e.target)) {
+        sel.classList.add('hidden');
+        document.removeEventListener('mousedown', closer);
+      }
+    };
+    document.addEventListener('mousedown', closer);
+  }, 50);
+}
+
+// ============ PIPELINE RENDERING ============
+function renderPipeline() {
+  const container = document.getElementById('pipeline-steps');
+  container.innerHTML = '';
+  if (pipeline.length === 0) {
+    container.innerHTML = '<span style="color:#bbb;font-size:0.85rem;">点击上方函数添加到管道中...</span>';
+    document.getElementById('btn-execute').disabled = true;
+    return;
+  }
+  document.getElementById('btn-execute').disabled = false;
+
+  pipeline.forEach((step, i) => {
+    if (i > 0) {
+      const arrow = document.createElement('span');
+      arrow.className = 'pipeline-arrow';
+      arrow.textContent = '\u27A1';
+      container.appendChild(arrow);
+    }
+    const el = document.createElement('div');
+    el.className = 'pipeline-step';
+    let label = '';
+    if (step.type === 'map') {
+      label = `映射 <span class="step-color-preview" style="background:${COLOR_HEX[step.params.from]}"></span> \u2192 <span class="step-color-preview" style="background:${COLOR_HEX[step.params.to]}"></span>`;
+    } else if (step.type === 'filter') {
+      label = `过滤 <span class="step-color-preview" style="background:${COLOR_HEX[step.params.color]}"></span>`;
+    } else if (step.type === 'stack') {
+      label = '堆叠';
+    } else if (step.type === 'reverse') {
+      label = '翻转';
+    } else if (step.type === 'rotate') {
+      label = '旋转';
+    }
+    el.innerHTML = label + `<span class="remove-step" data-idx="${i}">&times;</span>`;
+    el.querySelector('.remove-step').onclick = (e) => {
+      e.stopPropagation();
+      pipeline.splice(i, 1);
+      renderPipeline();
+    };
+    container.appendChild(el);
+  });
+}
+
+// ============ CLEAR PIPELINE ============
+function clearPipeline() {
+  if (isExecuting) return;
+  pipeline = [];
+  renderPipeline();
+}
+
+// ============ RESET LEVEL ============
+function resetLevel() {
+  if (isExecuting) return;
+  const lvl = LEVELS[currentLevel];
+  currentGrid = lvl.initial.map(col => [...col]);
+  pipeline = [];
+  renderGrid('current-grid', currentGrid, true);
+  renderPipeline();
+}
+
+// ============ TRANSFORM FUNCTIONS ============
+function applyMap(grid, from, to) {
+  return grid.map(col => col.map(c => c === from ? to : c));
+}
+
+function applyFilter(grid, color) {
+  return grid.map(col => col.filter(c => c !== color)).filter(col => col.length > 0);
+}
+
+function applyStack(grid) {
+  // Gather all cubes, redistribute into columns filling from left
+  // Stack semantics: compress each column by removing empty gaps,
+  // then merge columns that are side by side
+  // Actually for this game: merge every two adjacent columns into one
+  if (grid.length <= 1) return grid;
+  const result = [];
+  for (let i = 0; i < grid.length; i += 2) {
+    if (i + 1 < grid.length) {
+      result.push([...grid[i], ...grid[i+1]]);
+    } else {
+      result.push([...grid[i]]);
+    }
+  }
+  return result;
+}
+
+function applyReverse(grid) {
+  return grid.map(col => [...col].reverse());
+}
+
+function applyRotate(grid) {
+  // Rotate 90 degrees clockwise
+  // Grid is array of columns, each column stored bottom-to-top
+  const numCols = grid.length;
+  const maxRows = Math.max(0, ...grid.map(c => c.length));
+  if (numCols === 0 || maxRows === 0) return grid;
+
+  // Build a 2D visual matrix (row, col) where row 0 = bottom
+  const matrix = [];
+  for (let r = 0; r < maxRows; r++) {
+    matrix[r] = [];
+    for (let c = 0; c < numCols; c++) {
+      matrix[r][c] = r < grid[c].length ? grid[c][r] : null;
+    }
+  }
+
+  // 90 CW in visual space: new(row, col) = old(numCols-1-col, row)
+  // New dimensions: newMaxRows = numCols, newNumCols = maxRows
+  const newNumCols = maxRows;
+  const newMaxRows = numCols;
+
+  // Convert back to column-based storage
+  const result = [];
+  for (let nc = 0; nc < newNumCols; nc++) {
+    const col = [];
+    for (let nr = 0; nr < newMaxRows; nr++) {
+      // new visual (nr, nc) = old visual (numCols-1-nc, nr)
+      const oldRow = nc;
+      const oldCol = numCols - 1 - nr;
+      const val = matrix[oldRow][oldCol];
+      if (val !== null) col.push(val);
+    }
+    if (col.length > 0) result.push(col);
+  }
+  return result.length > 0 ? result : [[]];
+}
+
+function applyTransform(grid, step) {
+  switch(step.type) {
+    case 'map': return applyMap(grid, step.params.from, step.params.to);
+    case 'filter': return applyFilter(grid, step.params.color);
+    case 'stack': return applyStack(grid);
+    case 'reverse': return applyReverse(grid);
+    case 'rotate': return applyRotate(grid);
+    default: return grid;
+  }
+}
+
+// ============ EXECUTE PIPELINE ============
+async function executePipeline() {
+  if (isExecuting || pipeline.length === 0) return;
+  isExecuting = true;
+  document.getElementById('btn-execute').disabled = true;
+
+  const indicator = document.getElementById('exec-indicator');
+  indicator.classList.add('show');
+
+  // Reset grid to initial state
+  const lvl = LEVELS[currentLevel];
+  let grid = lvl.initial.map(col => [...col]);
+
+  // Highlight steps one by one
+  const stepEls = document.querySelectorAll('.pipeline-step');
+
+  for (let i = 0; i < pipeline.length; i++) {
+    // Highlight current step
+    stepEls.forEach((el, j) => {
+      el.style.opacity = j === i ? '1' : '0.4';
+      el.style.transform = j === i ? 'scale(1.1)' : 'scale(1)';
+    });
+
+    await sleep(350);
+
+    grid = applyTransform(grid, pipeline[i]);
+    currentGrid = grid.map(col => [...col]);
+    renderGrid('current-grid', currentGrid, true);
+
+    await sleep(450);
+  }
+
+  // Reset step highlights
+  stepEls.forEach(el => {
+    el.style.opacity = '1';
+    el.style.transform = 'scale(1)';
+  });
+
+  indicator.classList.remove('show');
+  isExecuting = false;
+  document.getElementById('btn-execute').disabled = false;
+
+  // Check win
+  if (gridsEqual(currentGrid, lvl.target)) {
+    await sleep(300);
+    onWin();
+  }
+}
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+// ============ GRID COMPARISON ============
+function gridsEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].length !== b[i].length) return false;
+    for (let j = 0; j < a[i].length; j++) {
+      if (a[i][j] !== b[i][j]) return false;
+    }
+  }
+  return true;
+}
+
+// ============ WIN ============
+function onWin() {
+  completedLevels.add(currentLevel);
+  try {
+    localStorage.setItem('cubeComposerProgress', JSON.stringify([...completedLevels]));
+  } catch(e) {}
+
+  const overlay = document.getElementById('success-overlay');
+  const isLast = currentLevel >= LEVELS.length - 1;
+  document.getElementById('btn-next').style.display = isLast ? 'none' : 'inline-block';
+  document.getElementById('success-msg').textContent = isLast
+    ? '恭喜你完成了所有关卡！你已经是函数式编程大师了！'
+    : `你成功完成了第 ${currentLevel + 1} 关！`;
+  overlay.classList.add('show');
+  spawnConfetti();
+}
+
+function closeSuccess() {
+  document.getElementById('success-overlay').classList.remove('show');
+}
+
+function nextLevel() {
+  closeSuccess();
+  if (currentLevel < LEVELS.length - 1) {
+    startLevel(currentLevel + 1);
+  }
+}
+
+// ============ CONFETTI ============
+function spawnConfetti() {
+  const container = document.getElementById('confetti-container');
+  container.innerHTML = '';
+  const confettiColors = ['#e74c3c','#3498db','#f1c40f','#2ecc71','#e67e22','#9b59b6','#667eea','#764ba2'];
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    const color = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+    const left = Math.random() * 100;
+    const duration = 1.5 + Math.random() * 2;
+    const delay = Math.random() * 0.8;
+    const size = 6 + Math.random() * 10;
+    const shapes = ['50%', '2px', '0'];
+    const br = shapes[Math.floor(Math.random() * shapes.length)];
+    piece.style.cssText = `
+      left: ${left}%;
+      width: ${size}px;
+      height: ${size}px;
+      background: ${color};
+      border-radius: ${br};
+      animation-duration: ${duration}s;
+      animation-delay: ${delay}s;
+    `;
+    container.appendChild(piece);
+  }
+  setTimeout(() => { container.innerHTML = ''; }, 4000);
+}
+
+// ============ INIT ============
+renderLevelSelect();
+</script>
+</body>
+</html>

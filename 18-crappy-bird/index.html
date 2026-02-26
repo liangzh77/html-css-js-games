@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>像素鸟</title>
+<style>
+*{margin:0;padding:0}
+body{background:#000;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden}
+canvas{display:block;max-width:100vw;max-height:100vh}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const W = 288, H = 512, GAP = 120, PIPE_W = 52, PIPE_SPD = 2, GRAV = 0.5, FLAP = -7, GND_H = 80;
+const cv = document.getElementById('c'), cx = cv.getContext('2d');
+cv.width = W; cv.height = H;
+
+let bird, pipes, score, best = +localStorage.getItem('fb_best') || 0, state, gndX, frame;
+
+function reset() {
+  bird = { x: 80, y: 200, v: 0, r: 14 };
+  pipes = []; score = 0; gndX = 0; frame = 0; state = 'ready';
+}
+reset();
+
+function addPipe() {
+  let topH = 60 + Math.random() * (H - GND_H - GAP - 120);
+  pipes.push({ x: W, top: topH, scored: false });
+}
+
+function flap() {
+  if (state === 'ready') { state = 'play'; bird.v = FLAP; addPipe(); }
+  else if (state === 'play') bird.v = FLAP;
+  else if (state === 'over') reset();
+}
+
+cv.addEventListener('click', flap);
+document.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); flap(); } });
+
+function collide() {
+  let b = bird;
+  if (b.y + b.r > H - GND_H || b.y - b.r < 0) return true;
+  for (let p of pipes) {
+    if (b.x + b.r > p.x && b.x - b.r < p.x + PIPE_W) {
+      if (b.y - b.r < p.top || b.y + b.r > p.top + GAP) return true;
+    }
+  }
+  return false;
+}
+
+function drawBg() {
+  let g = cx.createLinearGradient(0, 0, 0, H - GND_H);
+  g.addColorStop(0, '#4ec0ca'); g.addColorStop(1, '#bee6fd');
+  cx.fillStyle = g; cx.fillRect(0, 0, W, H - GND_H);
+}
+
+function drawGnd() {
+  cx.fillStyle = '#ded895'; cx.fillRect(0, H - GND_H, W, GND_H);
+  cx.fillStyle = '#8b6914'; cx.fillRect(0, H - GND_H, W, 12);
+  // ground stripes
+  cx.strokeStyle = '#6b4e0a'; cx.lineWidth = 1;
+  for (let i = -1; i < W / 20 + 1; i++) {
+    let sx = (i * 20 + gndX % 20 + 20) % (W + 20) - 10;
+    cx.beginPath(); cx.moveTo(sx, H - GND_H); cx.lineTo(sx + 10, H - GND_H + 12); cx.stroke();
+  }
+}
+
+function drawPipe(p) {
+  // pipe body
+  cx.fillStyle = '#5a2'; cx.fillRect(p.x, 0, PIPE_W, p.top);
+  cx.fillRect(p.x, p.top + GAP, PIPE_W, H - GND_H - p.top - GAP);
+  // pipe caps
+  cx.fillStyle = '#4a1'; let capW = 6;
+  cx.fillRect(p.x - capW / 2, p.top - 24, PIPE_W + capW, 24);
+  cx.fillRect(p.x - capW / 2, p.top + GAP, PIPE_W + capW, 24);
+  // highlight
+  cx.fillStyle = 'rgba(255,255,255,0.15)';
+  cx.fillRect(p.x + 4, 0, 8, p.top - 24);
+  cx.fillRect(p.x + 4, p.top + GAP + 24, 8, H - GND_H - p.top - GAP - 24);
+}
+
+function drawBird() {
+  let b = bird, tilt = state === 'play' ? Math.min(b.v * 4, 80) : 0;
+  cx.save(); cx.translate(b.x, b.y); cx.rotate(tilt * Math.PI / 180);
+  // body
+  cx.fillStyle = '#fc3'; cx.beginPath(); cx.arc(0, 0, b.r, 0, Math.PI * 2); cx.fill();
+  cx.strokeStyle = '#c90'; cx.lineWidth = 1.5; cx.stroke();
+  // wing
+  cx.fillStyle = '#fa0';
+  cx.beginPath(); cx.ellipse(-4, 4, 9, 5, -0.3, 0, Math.PI * 2); cx.fill();
+  // eye
+  cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(5, -4, 5, 0, Math.PI * 2); cx.fill();
+  cx.fillStyle = '#000'; cx.beginPath(); cx.arc(7, -4, 2.5, 0, Math.PI * 2); cx.fill();
+  // beak
+  cx.fillStyle = '#f64'; cx.beginPath(); cx.moveTo(10, 1); cx.lineTo(20, 4); cx.lineTo(10, 7); cx.fill();
+  cx.restore();
+}
+
+function drawScore() {
+  cx.fillStyle = '#fff'; cx.strokeStyle = '#000'; cx.lineWidth = 3;
+  cx.font = 'bold 40px Arial'; cx.textAlign = 'center';
+  cx.strokeText(score, W / 2, 60); cx.fillText(score, W / 2, 60);
+}
+
+function drawReady() {
+  cx.fillStyle = '#fff'; cx.strokeStyle = '#000'; cx.lineWidth = 3;
+  cx.font = 'bold 32px Arial'; cx.textAlign = 'center';
+  cx.strokeText('像素鸟', W / 2, 160); cx.fillText('像素鸟', W / 2, 160);
+  cx.font = '20px Arial';
+  cx.strokeText('点击开始', W / 2, 340); cx.fillText('点击开始', W / 2, 340);
+}
+
+function drawOver() {
+  cx.fillStyle = 'rgba(0,0,0,0.4)'; cx.fillRect(0, 0, W, H);
+  cx.fillStyle = '#fff'; cx.strokeStyle = '#000'; cx.lineWidth = 3;
+  cx.font = 'bold 36px Arial'; cx.textAlign = 'center';
+  cx.strokeText('游戏结束', W / 2, 160); cx.fillText('游戏结束', W / 2, 160);
+  cx.font = '22px Arial';
+  cx.strokeText('得分: ' + score, W / 2, 220); cx.fillText('得分: ' + score, W / 2, 220);
+  cx.strokeText('最佳: ' + best, W / 2, 260); cx.fillText('最佳: ' + best, W / 2, 260);
+  cx.font = '18px Arial';
+  cx.strokeText('点击重试', W / 2, 340); cx.fillText('点击重试', W / 2, 340);
+}
+
+function update() {
+  if (state === 'play') {
+    bird.v += GRAV; bird.y += bird.v;
+    // pipes
+    for (let p of pipes) {
+      p.x -= PIPE_SPD;
+      if (!p.scored && p.x + PIPE_W < bird.x) { score++; p.scored = true; }
+    }
+    if (pipes.length === 0 || pipes[pipes.length - 1].x < W - 180) addPipe();
+    pipes = pipes.filter(p => p.x > -PIPE_W);
+    gndX -= PIPE_SPD;
+    if (collide()) {
+      state = 'over';
+      if (score > best) { best = score; localStorage.setItem('fb_best', best); }
+    }
+  } else if (state === 'ready') {
+    bird.y = 200 + Math.sin(frame * 0.06) * 12;
+    gndX -= PIPE_SPD;
+  }
+  frame++;
+}
+
+function draw() {
+  drawBg(); pipes.forEach(drawPipe); drawGnd(); drawBird();
+  if (state === 'play') drawScore();
+  else if (state === 'ready') drawReady();
+  else drawOver();
+}
+
+(function loop() { update(); draw(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>

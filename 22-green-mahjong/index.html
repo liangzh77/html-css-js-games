@@ -1,0 +1,1249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>麻将连连看</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+@font-face {
+  font-family: 'MahjongFont';
+  src: local('SimSun'), local('Microsoft YaHei'), local('KaiTi'), local('STKaiti');
+}
+
+body {
+  font-family: 'Microsoft YaHei', 'SimSun', 'KaiTi', sans-serif;
+  background: #1a472a;
+  background-image:
+    radial-gradient(ellipse at center, #2d6b3f 0%, #1a472a 70%);
+  min-height: 100vh;
+  overflow: hidden;
+  color: #e8d5a3;
+  user-select: none;
+}
+
+/* Felt texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='6' height='6' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Header */
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: linear-gradient(180deg, #0d2818 0%, #163d26 100%);
+  border-bottom: 2px solid #c9a84c;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  flex-shrink: 0;
+}
+
+#header h1 {
+  font-size: 26px;
+  color: #f0d060;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6), 0 0 20px rgba(240,208,96,0.3);
+  letter-spacing: 6px;
+  font-weight: 700;
+}
+
+#stats {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  font-size: 15px;
+}
+
+#stats span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#stats .label {
+  color: #a8c4a0;
+  font-size: 13px;
+}
+
+#stats .value {
+  color: #f0d060;
+  font-weight: bold;
+  font-size: 16px;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* Toolbar */
+#toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 20px;
+  gap: 10px;
+  background: rgba(0,0,0,0.25);
+  flex-shrink: 0;
+}
+
+.btn {
+  padding: 7px 18px;
+  border: 1px solid #c9a84c;
+  background: linear-gradient(180deg, #2a5c38 0%, #1d4a2b 100%);
+  color: #e8d5a3;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.btn:hover {
+  background: linear-gradient(180deg, #3a7c4a 0%, #2a5c38 100%);
+  color: #f0d060;
+  box-shadow: 0 0 10px rgba(201,168,76,0.3);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn.primary {
+  background: linear-gradient(180deg, #c9a84c 0%, #a8873a 100%);
+  color: #1a2f1a;
+  font-weight: bold;
+}
+
+.btn.primary:hover {
+  background: linear-gradient(180deg, #e0c060 0%, #c9a84c 100%);
+}
+
+select.btn {
+  appearance: none;
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23e8d5a3' fill='none' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+/* Game area */
+#gameArea {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#boardContainer {
+  position: relative;
+  transform-origin: center center;
+}
+
+/* Tile styling */
+.tile {
+  position: absolute;
+  width: 44px;
+  height: 58px;
+  cursor: pointer;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 1;
+}
+
+.tile .tile-face {
+  position: absolute;
+  top: 0; left: 0;
+  width: 44px;
+  height: 58px;
+  background: linear-gradient(170deg, #fff8ee 0%, #f5ead5 40%, #e8dcc0 100%);
+  border: 1px solid #b8a882;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    1px 1px 0 #d4c8a8,
+    2px 2px 0 #c8bc98,
+    3px 3px 0 #beb28e,
+    4px 4px 1px rgba(0,0,0,0.25);
+  overflow: hidden;
+}
+
+/* 3D depth sides */
+.tile .tile-right {
+  position: absolute;
+  top: 2px;
+  right: -4px;
+  width: 4px;
+  height: 58px;
+  background: linear-gradient(180deg, #c8bc98 0%, #a89878 100%);
+  border-radius: 0 3px 3px 0;
+}
+
+.tile .tile-bottom {
+  position: absolute;
+  bottom: -4px;
+  left: 2px;
+  width: 44px;
+  height: 4px;
+  background: linear-gradient(90deg, #a89878 0%, #c8bc98 100%);
+  border-radius: 0 0 3px 3px;
+}
+
+.tile .tile-corner {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 4px;
+  height: 4px;
+  background: #a89878;
+  border-radius: 0 0 3px 0;
+}
+
+/* Layer offset for stacking */
+.tile[data-layer="1"] { z-index: 10; }
+.tile[data-layer="1"] .tile-face {
+  box-shadow:
+    1px 1px 0 #d4c8a8,
+    2px 2px 0 #c8bc98,
+    3px 3px 0 #beb28e,
+    4px 4px 0 #b2a684,
+    5px 5px 2px rgba(0,0,0,0.3);
+}
+
+.tile[data-layer="2"] { z-index: 20; }
+.tile[data-layer="2"] .tile-face {
+  box-shadow:
+    1px 1px 0 #d4c8a8,
+    2px 2px 0 #c8bc98,
+    3px 3px 0 #beb28e,
+    4px 4px 0 #b2a684,
+    5px 5px 0 #a69a7a,
+    6px 6px 3px rgba(0,0,0,0.35);
+}
+
+.tile[data-layer="3"] { z-index: 30; }
+.tile[data-layer="3"] .tile-face {
+  box-shadow:
+    1px 1px 0 #d4c8a8,
+    2px 2px 0 #c8bc98,
+    3px 3px 0 #beb28e,
+    4px 4px 0 #b2a684,
+    5px 5px 0 #a69a7a,
+    6px 6px 0 #9a8e70,
+    7px 7px 4px rgba(0,0,0,0.4);
+}
+
+.tile[data-layer="4"] { z-index: 40; }
+
+/* Tile states */
+.tile.blocked .tile-face {
+  background: linear-gradient(170deg, #e8dcc0 0%, #d8ccb0 40%, #c8bca0 100%);
+  filter: brightness(0.88);
+}
+
+.tile.blocked {
+  cursor: default;
+}
+
+.tile.free .tile-face {
+  background: linear-gradient(170deg, #fffdf4 0%, #f8f0da 40%, #f0e8c8 100%);
+}
+
+.tile.free:hover .tile-face {
+  background: linear-gradient(170deg, #fffff8 0%, #fff8e0 40%, #f8f0d0 100%);
+  border-color: #d4a830;
+  box-shadow:
+    0 0 8px rgba(212,168,48,0.5),
+    1px 1px 0 #d4c8a8,
+    2px 2px 0 #c8bc98,
+    3px 3px 0 #beb28e,
+    4px 4px 1px rgba(0,0,0,0.25);
+}
+
+.tile.selected .tile-face {
+  background: linear-gradient(170deg, #e8f8e0 0%, #c0e8b0 40%, #a0d890 100%);
+  border-color: #4a8c3a;
+  box-shadow:
+    0 0 12px rgba(74,140,58,0.6),
+    1px 1px 0 #88b878,
+    2px 2px 0 #78a868,
+    3px 3px 0 #689858,
+    4px 4px 2px rgba(0,0,0,0.3);
+}
+
+.tile.hint .tile-face {
+  background: linear-gradient(170deg, #fff8d0 0%, #f0e0a0 40%, #e8d080 100%);
+  border-color: #d4a830;
+  animation: hintPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes hintPulse {
+  from { box-shadow: 0 0 6px rgba(212,168,48,0.4), 1px 1px 0 #d4c8a8, 2px 2px 0 #c8bc98, 3px 3px 0 #beb28e, 4px 4px 1px rgba(0,0,0,0.25); }
+  to   { box-shadow: 0 0 18px rgba(212,168,48,0.8), 1px 1px 0 #d4c8a8, 2px 2px 0 #c8bc98, 3px 3px 0 #beb28e, 4px 4px 1px rgba(0,0,0,0.25); }
+}
+
+/* Tile removal animation */
+.tile.removing {
+  animation: tileRemove 0.45s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes tileRemove {
+  0%   { opacity: 1; transform: scale(1) translateY(0); }
+  40%  { opacity: 1; transform: scale(1.15) translateY(-5px); }
+  100% { opacity: 0; transform: scale(0.3) translateY(-30px); }
+}
+
+/* Tile content */
+.tile-label {
+  font-size: 11px;
+  color: #888;
+  line-height: 1;
+  margin-bottom: 1px;
+}
+
+.tile-char {
+  font-size: 22px;
+  font-weight: bold;
+  line-height: 1.1;
+}
+
+.tile-sub {
+  font-size: 10px;
+  color: #666;
+  line-height: 1;
+  margin-top: 1px;
+}
+
+/* Suit colors */
+.suit-wan .tile-char { color: #1a6b1a; }
+.suit-tiao .tile-char { color: #2266aa; }
+.suit-bing .tile-char { color: #cc4400; }
+.suit-feng .tile-char { color: #333; }
+.suit-jian .tile-char { color: #cc0000; }
+.suit-jian .tile-char.fa { color: #1a8a1a; }
+.suit-jian .tile-char.bai { color: #4488cc; }
+.suit-hua .tile-char { color: #8844aa; }
+.suit-hua2 .tile-char { color: #cc6600; }
+
+/* Modal */
+#modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+#modal.show {
+  display: flex;
+}
+
+#modalBox {
+  background: linear-gradient(180deg, #2a5c38 0%, #1d4a2b 100%);
+  border: 3px solid #c9a84c;
+  border-radius: 12px;
+  padding: 36px 48px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+  max-width: 420px;
+}
+
+#modalBox h2 {
+  font-size: 28px;
+  color: #f0d060;
+  margin-bottom: 16px;
+  letter-spacing: 4px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+#modalBox p {
+  font-size: 16px;
+  color: #c8d8c0;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+#modalBox .btn {
+  font-size: 16px;
+  padding: 10px 30px;
+  margin: 0 6px;
+}
+
+/* Layout selector in modal */
+#layoutModal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+
+#layoutModal.show {
+  display: flex;
+}
+
+#layoutBox {
+  background: linear-gradient(180deg, #2a5c38 0%, #1d4a2b 100%);
+  border: 3px solid #c9a84c;
+  border-radius: 12px;
+  padding: 30px 40px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+}
+
+#layoutBox h2 {
+  font-size: 24px;
+  color: #f0d060;
+  margin-bottom: 20px;
+  letter-spacing: 4px;
+}
+
+.layout-options {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.layout-card {
+  width: 140px;
+  padding: 16px 12px;
+  background: rgba(0,0,0,0.3);
+  border: 2px solid #4a6a4a;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.layout-card:hover, .layout-card.active {
+  border-color: #c9a84c;
+  background: rgba(201,168,76,0.15);
+}
+
+.layout-card .layout-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.layout-card .layout-name {
+  font-size: 15px;
+  color: #e8d5a3;
+  font-weight: bold;
+}
+
+.layout-card .layout-desc {
+  font-size: 12px;
+  color: #a8b8a0;
+  margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  #header { padding: 6px 12px; }
+  #header h1 { font-size: 20px; letter-spacing: 3px; }
+  #stats { gap: 12px; font-size: 13px; }
+  .btn { padding: 5px 12px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>麻将连连看</h1>
+    <div id="stats">
+      <span>
+        <span class="label">时间</span>
+        <span class="value" id="timer">00:00</span>
+      </span>
+      <span>
+        <span class="label">剩余</span>
+        <span class="value" id="remaining">0</span>
+      </span>
+      <span>
+        <span class="label">已消</span>
+        <span class="value" id="matched">0</span>
+      </span>
+    </div>
+  </div>
+  <div id="toolbar">
+    <button class="btn primary" id="btnNewGame">新游戏</button>
+    <button class="btn" id="btnHint">提示</button>
+    <button class="btn" id="btnShuffle">洗牌</button>
+    <button class="btn" id="btnUndo">撤销</button>
+  </div>
+  <div id="gameArea">
+    <div id="boardContainer"></div>
+  </div>
+</div>
+
+<!-- Win/Lose Modal -->
+<div id="modal">
+  <div id="modalBox">
+    <h2 id="modalTitle"></h2>
+    <p id="modalMsg"></p>
+    <button class="btn primary" id="modalBtn">再来一局</button>
+  </div>
+</div>
+
+<!-- Layout Selection Modal -->
+<div id="layoutModal">
+  <div id="layoutBox">
+    <h2>选择牌局</h2>
+    <div class="layout-options" id="layoutOptions"></div>
+    <button class="btn primary" id="layoutStart">开始游戏</button>
+    <button class="btn" id="layoutCancel" style="margin-left:8px;">取消</button>
+  </div>
+</div>
+
+<script>
+// ==================== TILE DEFINITIONS ====================
+const TILE_TYPES = [];
+const NUM_CHARS = ['一','二','三','四','五','六','七','八','九'];
+
+// 万 (Characters) - 4 copies each
+for (let i = 0; i < 9; i++) {
+  TILE_TYPES.push({ id: `wan_${i}`, suit: 'wan', label: NUM_CHARS[i] + '万', char: NUM_CHARS[i], sub: '万', matchGroup: `wan_${i}` });
+}
+// 条 (Bamboo) - 4 copies each
+for (let i = 0; i < 9; i++) {
+  TILE_TYPES.push({ id: `tiao_${i}`, suit: 'tiao', label: NUM_CHARS[i] + '条', char: NUM_CHARS[i], sub: '条', matchGroup: `tiao_${i}` });
+}
+// 饼 (Circles) - 4 copies each
+for (let i = 0; i < 9; i++) {
+  TILE_TYPES.push({ id: `bing_${i}`, suit: 'bing', label: NUM_CHARS[i] + '饼', char: NUM_CHARS[i], sub: '饼', matchGroup: `bing_${i}` });
+}
+// 风 (Winds) - 4 copies each
+const WINDS = ['东','南','西','北'];
+for (let i = 0; i < 4; i++) {
+  TILE_TYPES.push({ id: `feng_${i}`, suit: 'feng', label: WINDS[i] + '风', char: WINDS[i], sub: '风', matchGroup: `feng_${i}` });
+}
+// 箭 (Dragons) - 4 copies each
+const DRAGONS = [{c:'中',cls:'zhong'},{c:'发',cls:'fa'},{c:'白',cls:'bai'}];
+for (let i = 0; i < 3; i++) {
+  TILE_TYPES.push({ id: `jian_${i}`, suit: 'jian', label: DRAGONS[i].c, char: DRAGONS[i].c, sub: '', cls: DRAGONS[i].cls, matchGroup: `jian_${i}` });
+}
+// 花 (Flowers) - 1 copy each, but flowers match any other flower
+// Season flowers: 春夏秋冬
+const SEASON_FLOWERS = ['春','夏','秋','冬'];
+for (let i = 0; i < 4; i++) {
+  TILE_TYPES.push({ id: `hua_s${i}`, suit: 'hua', label: SEASON_FLOWERS[i], char: SEASON_FLOWERS[i], sub: '花', matchGroup: `hua_season`, unique: true });
+}
+// Plant flowers: 梅兰竹菊
+const PLANT_FLOWERS = ['梅','兰','竹','菊'];
+for (let i = 0; i < 4; i++) {
+  TILE_TYPES.push({ id: `hua_p${i}`, suit: 'hua2', label: PLANT_FLOWERS[i], char: PLANT_FLOWERS[i], sub: '花', matchGroup: `hua_plant`, unique: true });
+}
+
+// Total unique types: 9+9+9+4+3 = 34 standard (x4=136) + 8 flowers = 144 tiles
+
+function buildTileDeck() {
+  const deck = [];
+  TILE_TYPES.forEach(t => {
+    if (t.unique) {
+      deck.push({ ...t });
+    } else {
+      for (let c = 0; c < 4; c++) {
+        deck.push({ ...t });
+      }
+    }
+  });
+  return deck; // 144 tiles
+}
+
+// ==================== LAYOUTS ====================
+// Each layout is an array of {col, row, layer} positions
+// col/row are in half-tile units for fine positioning
+
+const LAYOUTS = {
+  turtle: {
+    name: '龟背',
+    desc: '经典布局',
+    icon: '🐢',
+    positions: buildTurtleLayout()
+  },
+  pyramid: {
+    name: '金字塔',
+    desc: '层叠布局',
+    icon: '🔺',
+    positions: buildPyramidLayout()
+  },
+  fortress: {
+    name: '城堡',
+    desc: '坚固布局',
+    icon: '🏯',
+    positions: buildFortressLayout()
+  }
+};
+
+function buildTurtleLayout() {
+  const pos = [];
+  // Classic turtle shape: 88 + 36 + 16 + 4 = 144 tiles
+  // Layer 0: Turtle body shape (88 tiles)
+  const layer0 = [
+    // Row 0 (top): 12 tiles, cols 1-12
+    [1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],
+    // Row 1: 8 tiles, cols 3-10
+    [3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[9,1],[10,1],
+    // Row 2: 10 tiles, cols 2-11
+    [2,2],[3,2],[4,2],[5,2],[6,2],[7,2],[8,2],[9,2],[10,2],[11,2],
+    // Row 3: 14 tiles, cols 0-13 (wide body with ears)
+    [0,3],[1,3],[2,3],[3,3],[4,3],[5,3],[6,3],[7,3],[8,3],[9,3],[10,3],[11,3],[12,3],[13,3],
+    // Row 4: 14 tiles, cols 0-13
+    [0,4],[1,4],[2,4],[3,4],[4,4],[5,4],[6,4],[7,4],[8,4],[9,4],[10,4],[11,4],[12,4],[13,4],
+    // Row 5: 10 tiles, cols 2-11
+    [2,5],[3,5],[4,5],[5,5],[6,5],[7,5],[8,5],[9,5],[10,5],[11,5],
+    // Row 6: 8 tiles, cols 3-10
+    [3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],
+    // Row 7 (bottom): 12 tiles, cols 1-12
+    [1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],[12,7],
+  ];
+  layer0.forEach(([c,r]) => pos.push({ col: c*2, row: r*2, layer: 0 }));
+
+  // Layer 1: 6x6 rectangle (36 tiles)
+  const layer1 = [];
+  for (let r = 1; r <= 6; r++) {
+    for (let c = 4; c <= 9; c++) {
+      layer1.push([c, r]);
+    }
+  }
+  layer1.forEach(([c,r]) => pos.push({ col: c*2, row: r*2, layer: 1 }));
+
+  // Layer 2: 4x4 rectangle (16 tiles)
+  const layer2 = [];
+  for (let r = 2; r <= 5; r++) {
+    for (let c = 5; c <= 8; c++) {
+      layer2.push([c, r]);
+    }
+  }
+  layer2.forEach(([c,r]) => pos.push({ col: c*2, row: r*2, layer: 2 }));
+
+  // Layer 3: 2x2 center cap (4 tiles)
+  const layer3 = [
+    [6,3],[7,3],
+    [6,4],[7,4],
+  ];
+  layer3.forEach(([c,r]) => pos.push({ col: c*2, row: r*2, layer: 3 }));
+
+  return pos; // 88 + 36 + 16 + 4 = 144
+}
+
+function buildPyramidLayout() {
+  const pos = [];
+  // Layer 0: 10x8 = 80
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 10; c++) {
+      pos.push({ col: c*2, row: r*2, layer: 0 });
+    }
+  }
+  // Layer 1: 8x6 = 48
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 8; c++) {
+      pos.push({ col: c*2+2, row: r*2+2, layer: 1 });
+    }
+  }
+  // Layer 2: 4x3 = 12
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 4; c++) {
+      pos.push({ col: c*2+6, row: r*2+5, layer: 2 });
+    }
+  }
+  // Layer 3: 2x2 = 4
+  pos.push({ col: 9, row: 8, layer: 3 });
+  pos.push({ col: 11, row: 8, layer: 3 });
+  pos.push({ col: 9, row: 10, layer: 3 });
+  pos.push({ col: 11, row: 10, layer: 3 });
+  return pos; // 144
+}
+
+function buildFortressLayout() {
+  const pos = [];
+  // Layer 0: a ring / fortress shape
+  // Outer ring 14x10 minus inner 10x6 = 14*10 - 10*6 = 140-60=80
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 14; c++) {
+      const isInner = (r >= 2 && r <= 7 && c >= 2 && c <= 11);
+      if (!isInner) {
+        pos.push({ col: c*2, row: r*2, layer: 0 });
+      }
+    }
+  }
+  // Layer 0 inner fill: 8x4 = 32
+  for (let r = 3; r < 7; r++) {
+    for (let c = 3; c < 11; c++) {
+      pos.push({ col: c*2, row: r*2, layer: 0 });
+    }
+  }
+  // Layer 1: 6x4 in center = 24
+  for (let r = 3; r < 7; r++) {
+    for (let c = 4; c < 10; c++) {
+      pos.push({ col: c*2, row: r*2, layer: 1 });
+    }
+  }
+  // Layer 2: 2x4 = 8
+  for (let r = 4; r < 6; r++) {
+    for (let c = 5; c < 9; c++) {
+      pos.push({ col: c*2, row: r*2, layer: 2 });
+    }
+  }
+  return pos; // 80+32+24+8 = 144
+}
+
+// ==================== GAME STATE ====================
+let gameState = {
+  tiles: [],           // active tiles on board
+  removedTiles: [],    // removed tile pairs for undo
+  selected: null,      // currently selected tile index
+  hintPair: null,      // current hint pair
+  timerInterval: null,
+  seconds: 0,
+  currentLayout: 'turtle',
+  gameActive: false,
+  matchedCount: 0,
+};
+
+// ==================== CORE LOGIC ====================
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function startNewGame(layoutKey) {
+  stopTimer();
+  gameState.currentLayout = layoutKey || gameState.currentLayout;
+  const layout = LAYOUTS[gameState.currentLayout];
+  if (!layout) return;
+
+  const positions = layout.positions;
+  const numTiles = positions.length;
+
+  // Build deck matching the number of positions
+  let deck = buildTileDeck();
+  // We need exactly numTiles tiles. Trim or pad to match.
+  // Standard = 144 tiles. If layout < 144, trim. If > 144, repeat.
+  while (deck.length < numTiles) {
+    deck = deck.concat(buildTileDeck());
+  }
+  deck = deck.slice(0, numTiles);
+
+  // Ensure all tiles can be matched (paired by matchGroup)
+  // Group them
+  const groups = {};
+  deck.forEach(t => {
+    if (!groups[t.matchGroup]) groups[t.matchGroup] = [];
+    groups[t.matchGroup].push(t);
+  });
+  // Each group should have even count; if odd, swap with another group
+  const allTiles = [];
+  Object.values(groups).forEach(g => {
+    if (g.length % 2 !== 0) {
+      // This can happen with flower tiles; add a duplicate
+      g.push({ ...g[0] });
+    }
+    allTiles.push(...g);
+  });
+
+  // Trim to exact size
+  const finalDeck = allTiles.slice(0, numTiles);
+  // If odd total, ensure even
+  if (finalDeck.length % 2 !== 0) {
+    finalDeck.pop();
+  }
+
+  shuffle(finalDeck);
+
+  // Assign tiles to positions
+  gameState.tiles = positions.map((pos, idx) => ({
+    ...finalDeck[idx],
+    col: pos.col,
+    row: pos.row,
+    layer: pos.layer,
+    idx: idx,
+    removed: false,
+  }));
+
+  gameState.selected = null;
+  gameState.hintPair = null;
+  gameState.removedTiles = [];
+  gameState.seconds = 0;
+  gameState.matchedCount = 0;
+  gameState.gameActive = true;
+
+  // Ensure at least one match exists; if not, shuffle
+  if (!findAnyMatch()) {
+    shuffleTiles();
+  }
+
+  renderBoard();
+  updateStats();
+  startTimer();
+}
+
+// Check if tile at position is "free" (not covered, has at least one side open)
+function isTileFree(tile) {
+  if (tile.removed) return false;
+  const tiles = gameState.tiles;
+
+  // Check if covered by any tile on a higher layer
+  for (const other of tiles) {
+    if (other.removed || other === tile) continue;
+    if (other.layer <= tile.layer) continue;
+    // A tile covers another if their bounding boxes overlap
+    // Each tile occupies 2 col-units wide, 2 row-units tall
+    if (Math.abs(other.col - tile.col) < 2 && Math.abs(other.row - tile.row) < 2) {
+      return false; // covered
+    }
+  }
+
+  // Check if both left and right sides are blocked by same-layer tiles
+  let leftBlocked = false;
+  let rightBlocked = false;
+  for (const other of tiles) {
+    if (other.removed || other === tile) continue;
+    if (other.layer !== tile.layer) continue;
+    // Same-layer adjacency: a tile is to the left if its col = tile.col - 2
+    // and its row overlaps (within 1 row unit)
+    if (other.col === tile.col - 2 && Math.abs(other.row - tile.row) < 2) {
+      leftBlocked = true;
+    }
+    if (other.col === tile.col + 2 && Math.abs(other.row - tile.row) < 2) {
+      rightBlocked = true;
+    }
+  }
+
+  if (leftBlocked && rightBlocked) return false;
+  return true;
+}
+
+function tilesMatch(a, b) {
+  return a.matchGroup === b.matchGroup;
+}
+
+function findAnyMatch() {
+  const freeTiles = gameState.tiles.filter(t => !t.removed && isTileFree(t));
+  for (let i = 0; i < freeTiles.length; i++) {
+    for (let j = i + 1; j < freeTiles.length; j++) {
+      if (tilesMatch(freeTiles[i], freeTiles[j])) {
+        return [freeTiles[i], freeTiles[j]];
+      }
+    }
+  }
+  return null;
+}
+
+function selectTile(tileIdx) {
+  if (!gameState.gameActive) return;
+  const tile = gameState.tiles[tileIdx];
+  if (!tile || tile.removed) return;
+  if (!isTileFree(tile)) return;
+
+  clearHint();
+
+  if (gameState.selected === null) {
+    gameState.selected = tileIdx;
+    updateTileStates();
+    return;
+  }
+
+  if (gameState.selected === tileIdx) {
+    gameState.selected = null;
+    updateTileStates();
+    return;
+  }
+
+  const selTile = gameState.tiles[gameState.selected];
+  if (tilesMatch(selTile, tile)) {
+    // Match found! Remove both
+    removePair(gameState.selected, tileIdx);
+  } else {
+    // No match - select the new tile
+    gameState.selected = tileIdx;
+    updateTileStates();
+  }
+}
+
+function removePair(idx1, idx2) {
+  const t1 = gameState.tiles[idx1];
+  const t2 = gameState.tiles[idx2];
+
+  // Store for undo
+  gameState.removedTiles.push({ idx1, idx2, tile1: { ...t1 }, tile2: { ...t2 } });
+
+  // Animate removal
+  const el1 = document.querySelector(`.tile[data-idx="${idx1}"]`);
+  const el2 = document.querySelector(`.tile[data-idx="${idx2}"]`);
+  if (el1) el1.classList.add('removing');
+  if (el2) el2.classList.add('removing');
+
+  gameState.selected = null;
+  gameState.matchedCount += 2;
+
+  setTimeout(() => {
+    t1.removed = true;
+    t2.removed = true;
+    renderBoard();
+    updateStats();
+    checkGameEnd();
+  }, 450);
+}
+
+function undoLastMove() {
+  if (!gameState.gameActive) return;
+  if (gameState.removedTiles.length === 0) return;
+
+  const last = gameState.removedTiles.pop();
+  const t1 = gameState.tiles[last.idx1];
+  const t2 = gameState.tiles[last.idx2];
+
+  // Restore tile data
+  Object.assign(t1, last.tile1);
+  Object.assign(t2, last.tile2);
+  t1.removed = false;
+  t2.removed = false;
+
+  gameState.matchedCount -= 2;
+  gameState.selected = null;
+  clearHint();
+
+  renderBoard();
+  updateStats();
+}
+
+function showHint() {
+  if (!gameState.gameActive) return;
+  clearHint();
+  const match = findAnyMatch();
+  if (match) {
+    gameState.hintPair = [match[0].idx, match[1].idx];
+    updateTileStates();
+  }
+}
+
+function clearHint() {
+  gameState.hintPair = null;
+}
+
+function shuffleTiles() {
+  if (!gameState.gameActive) return;
+  clearHint();
+  gameState.selected = null;
+
+  // Collect all non-removed tile data
+  const activeTiles = gameState.tiles.filter(t => !t.removed);
+  const tileData = activeTiles.map(t => ({
+    id: t.id, suit: t.suit, label: t.label, char: t.char,
+    sub: t.sub, cls: t.cls, matchGroup: t.matchGroup, unique: t.unique,
+  }));
+  shuffle(tileData);
+
+  // Reassign tile data to positions
+  activeTiles.forEach((t, i) => {
+    Object.assign(t, tileData[i]);
+  });
+
+  // Ensure a match exists after shuffle
+  if (!findAnyMatch()) {
+    shuffleTiles();
+    return;
+  }
+
+  renderBoard();
+}
+
+function checkGameEnd() {
+  const remaining = gameState.tiles.filter(t => !t.removed);
+  if (remaining.length === 0) {
+    // Win!
+    stopTimer();
+    gameState.gameActive = false;
+    setTimeout(() => showModal('恭喜通关！', `用时 ${formatTime(gameState.seconds)}，成功消除所有麻将牌！`), 300);
+    return;
+  }
+
+  if (!findAnyMatch()) {
+    // No moves available
+    stopTimer();
+    gameState.gameActive = false;
+    setTimeout(() => showModal('无路可走', `剩余 ${remaining.length} 张牌，没有可匹配的牌组了。\n可以尝试洗牌或开始新游戏。`, true), 300);
+  }
+}
+
+// ==================== TIMER ====================
+function startTimer() {
+  stopTimer();
+  gameState.seconds = 0;
+  updateTimerDisplay();
+  gameState.timerInterval = setInterval(() => {
+    gameState.seconds++;
+    updateTimerDisplay();
+  }, 1000);
+}
+
+function stopTimer() {
+  if (gameState.timerInterval) {
+    clearInterval(gameState.timerInterval);
+    gameState.timerInterval = null;
+  }
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function updateTimerDisplay() {
+  document.getElementById('timer').textContent = formatTime(gameState.seconds);
+}
+
+function updateStats() {
+  const remaining = gameState.tiles.filter(t => !t.removed).length;
+  document.getElementById('remaining').textContent = remaining;
+  document.getElementById('matched').textContent = gameState.matchedCount;
+}
+
+// ==================== RENDERING ====================
+const TILE_W = 44; // pixels
+const TILE_H = 58;
+const HALF_W = TILE_W / 2; // 22
+const HALF_H = TILE_H / 2; // 29
+const LAYER_OFFSET_X = -4;
+const LAYER_OFFSET_Y = -4;
+const TILE_DEPTH = 4; // right/bottom side pixels
+
+function renderBoard() {
+  const container = document.getElementById('boardContainer');
+  container.innerHTML = '';
+
+  const activeTiles = gameState.tiles.filter(t => !t.removed);
+  if (activeTiles.length === 0) {
+    container.style.width = '0px';
+    container.style.height = '0px';
+    return;
+  }
+
+  // Calculate bounds
+  let minCol = Infinity, maxCol = -Infinity, minRow = Infinity, maxRow = -Infinity;
+  let maxLayer = 0;
+  activeTiles.forEach(t => {
+    minCol = Math.min(minCol, t.col);
+    maxCol = Math.max(maxCol, t.col);
+    minRow = Math.min(minRow, t.row);
+    maxRow = Math.max(maxRow, t.row);
+    maxLayer = Math.max(maxLayer, t.layer);
+  });
+
+  // Board dimensions in pixels
+  const boardW = (maxCol - minCol + 2) * HALF_W + TILE_DEPTH * (maxLayer + 1) + 20;
+  const boardH = (maxRow - minRow + 2) * HALF_H + TILE_DEPTH * (maxLayer + 1) + 20;
+
+  container.style.width = boardW + 'px';
+  container.style.height = boardH + 'px';
+
+  // Scale to fit game area
+  const gameArea = document.getElementById('gameArea');
+  const areaW = gameArea.clientWidth - 20;
+  const areaH = gameArea.clientHeight - 20;
+  const scale = Math.min(1.0, areaW / boardW, areaH / boardH);
+  container.style.transform = `scale(${scale})`;
+
+  // Sort by layer then row then col for proper z-order
+  const sortedTiles = [...gameState.tiles].sort((a, b) => {
+    if (a.layer !== b.layer) return a.layer - b.layer;
+    if (a.row !== b.row) return a.row - b.row;
+    return a.col - b.col;
+  });
+
+  sortedTiles.forEach(tile => {
+    if (tile.removed) return;
+
+    const free = isTileFree(tile);
+    const selected = gameState.selected === tile.idx;
+    const hinted = gameState.hintPair && gameState.hintPair.includes(tile.idx);
+
+    const x = (tile.col - minCol) * HALF_W + tile.layer * LAYER_OFFSET_X + 10;
+    const y = (tile.row - minRow) * HALF_H + tile.layer * LAYER_OFFSET_Y + 10;
+
+    const el = document.createElement('div');
+    el.className = 'tile';
+    if (free) el.classList.add('free');
+    else el.classList.add('blocked');
+    if (selected) el.classList.add('selected');
+    if (hinted) el.classList.add('hint');
+    el.dataset.idx = tile.idx;
+    el.dataset.layer = tile.layer;
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.zIndex = tile.layer * 100 + tile.row * 2 + (tile.col > 0 ? 1 : 0);
+
+    // Tile face
+    const face = document.createElement('div');
+    face.className = `tile-face suit-${tile.suit}`;
+
+    // Tile content
+    const charEl = document.createElement('div');
+    charEl.className = 'tile-char' + (tile.cls ? ' ' + tile.cls : '');
+    charEl.textContent = tile.char;
+    face.appendChild(charEl);
+
+    if (tile.sub) {
+      const subEl = document.createElement('div');
+      subEl.className = 'tile-sub';
+      subEl.textContent = tile.sub;
+      face.appendChild(subEl);
+    }
+
+    el.appendChild(face);
+
+    // 3D depth sides
+    const right = document.createElement('div');
+    right.className = 'tile-right';
+    el.appendChild(right);
+
+    const bottom = document.createElement('div');
+    bottom.className = 'tile-bottom';
+    el.appendChild(bottom);
+
+    const corner = document.createElement('div');
+    corner.className = 'tile-corner';
+    el.appendChild(corner);
+
+    if (free) {
+      el.addEventListener('click', () => selectTile(tile.idx));
+    }
+
+    container.appendChild(el);
+  });
+}
+
+function updateTileStates() {
+  // Quick update without full re-render
+  document.querySelectorAll('.tile').forEach(el => {
+    const idx = parseInt(el.dataset.idx);
+    const tile = gameState.tiles[idx];
+    if (!tile || tile.removed) return;
+
+    const free = isTileFree(tile);
+    const selected = gameState.selected === idx;
+    const hinted = gameState.hintPair && gameState.hintPair.includes(idx);
+
+    el.classList.toggle('free', free);
+    el.classList.toggle('blocked', !free);
+    el.classList.toggle('selected', selected);
+    el.classList.toggle('hint', hinted);
+
+    if (free) {
+      el.style.cursor = 'pointer';
+      el.onclick = () => selectTile(idx);
+    } else {
+      el.style.cursor = 'default';
+      el.onclick = null;
+    }
+  });
+}
+
+// ==================== MODALS ====================
+function showModal(title, msg, isLose) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalMsg').textContent = msg;
+  document.getElementById('modal').classList.add('show');
+
+  const btn = document.getElementById('modalBtn');
+  if (isLose) {
+    btn.textContent = '再来一局';
+  } else {
+    btn.textContent = '再来一局';
+  }
+}
+
+function hideModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+
+function showLayoutSelector() {
+  const container = document.getElementById('layoutOptions');
+  container.innerHTML = '';
+
+  Object.entries(LAYOUTS).forEach(([key, layout]) => {
+    const card = document.createElement('div');
+    card.className = 'layout-card' + (key === gameState.currentLayout ? ' active' : '');
+    card.innerHTML = `
+      <div class="layout-icon">${layout.icon}</div>
+      <div class="layout-name">${layout.name}</div>
+      <div class="layout-desc">${layout.desc} (${layout.positions.length}张)</div>
+    `;
+    card.addEventListener('click', () => {
+      container.querySelectorAll('.layout-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      gameState.currentLayout = key;
+    });
+    container.appendChild(card);
+  });
+
+  document.getElementById('layoutModal').classList.add('show');
+}
+
+function hideLayoutSelector() {
+  document.getElementById('layoutModal').classList.remove('show');
+}
+
+// ==================== EVENT HANDLERS ====================
+document.getElementById('btnNewGame').addEventListener('click', showLayoutSelector);
+document.getElementById('btnHint').addEventListener('click', showHint);
+document.getElementById('btnShuffle').addEventListener('click', () => {
+  if (gameState.gameActive) {
+    shuffleTiles();
+  }
+});
+document.getElementById('btnUndo').addEventListener('click', undoLastMove);
+
+document.getElementById('modalBtn').addEventListener('click', () => {
+  hideModal();
+  showLayoutSelector();
+});
+
+document.getElementById('layoutStart').addEventListener('click', () => {
+  hideLayoutSelector();
+  startNewGame(gameState.currentLayout);
+});
+
+document.getElementById('layoutCancel').addEventListener('click', hideLayoutSelector);
+
+// Resize handler
+window.addEventListener('resize', () => {
+  if (gameState.gameActive) {
+    renderBoard();
+  }
+});
+
+// ==================== INITIALIZATION ====================
+// Auto-start with turtle layout
+startNewGame('turtle');
+</script>
+</body>
+</html>

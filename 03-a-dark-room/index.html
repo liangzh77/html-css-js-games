@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黑暗的房间</title>
+<style>
+body, .tooltip {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 16px;
+  font-weight: normal;
+  line-height: normal;
+}
+html { height: 100%; }
+body { height: 100%; margin: 0; background: #fff; color: #000; }
+::selection { background: transparent; }
+div.clear { clear: both; }
+
+div#wrapper {
+  margin: auto;
+  width: 700px;
+  padding: 20px 0 0 220px;
+  position: relative;
+}
+
+div#header {
+  padding-bottom: 20px;
+  height: 20px;
+}
+
+div.headerButton {
+  font-size: 17px;
+  cursor: pointer;
+  float: left;
+  border-left: 1px solid #000;
+  margin-left: 10px;
+  padding-left: 10px;
+  display: none;
+}
+div.headerButton:hover { text-decoration: underline; }
+div.headerButton:first-child { border-left: none; margin-left: 0; padding-left: 0; }
+div.headerButton.selected,
+div.headerButton.selected:hover {
+  cursor: default;
+  text-decoration: underline;
+}
+
+div#locationSliderContainer {
+  position: relative;
+  overflow: hidden;
+  width: 700px;
+}
+div#locationSlider {
+  position: relative;
+  transition: left 0.3s ease;
+  left: 0;
+  width: 1400px;
+}
+div.location {
+  position: relative;
+  float: left;
+  width: 700px;
+}
+
+/* Notifications */
+div#notifications {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  height: 700px;
+  width: 200px;
+  overflow: hidden;
+}
+div#notifications div.notification {
+  margin-bottom: 10px;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+div#notifyGradient {
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%; width: 100%;
+  background: linear-gradient(rgba(255,255,255,0) 0%, #fff 100%);
+  pointer-events: none;
+}
+
+/* Buttons */
+div.button {
+  position: relative;
+  text-align: center;
+  border: 1px solid #000;
+  width: 100px;
+  margin-bottom: 5px;
+  padding: 5px 10px;
+  cursor: pointer;
+  user-select: none;
+  display: none;
+}
+div.button:hover { text-decoration: underline; }
+div.button.disabled,
+div.button.disabled:hover {
+  cursor: default;
+  border-color: #b2b2b2;
+  color: #b2b2b2;
+  text-decoration: none;
+}
+div.button div.cooldown {
+  position: absolute;
+  top: 0; left: 0;
+  z-index: -1;
+  height: 100%;
+  background-color: #ddd;
+  width: 0%;
+  transition: width 0.1s linear;
+}
+div.button div.tooltip {
+  width: 100px;
+  display: none;
+  position: absolute;
+  border: 1px solid #000;
+  background: #fff;
+  padding: 5px 10px;
+  z-index: 20;
+  left: 110%;
+  top: 0;
+}
+div.button:hover div.tooltip { display: block; }
+div.button.free:hover div.tooltip,
+div.button.disabled:hover div.tooltip { display: none; }
+div.tooltip .row_key { float: left; font-weight: bold; }
+div.tooltip .row_val { float: right; }
+
+/* Stores */
+div#storesContainer {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+div#stores {
+  position: relative;
+  z-index: 10;
+  border: 1px solid #000;
+  cursor: default;
+  padding: 5px 10px;
+  width: 200px;
+  display: none;
+}
+div#stores::before {
+  position: absolute;
+  background: #fff;
+  content: attr(data-legend);
+  left: 8px;
+  top: -13px;
+}
+div.storeRow { padding: 2px 0; }
+div.storeRow .row_key { float: left; }
+div.storeRow .row_val { float: right; }
+
+/* Build & Craft */
+div#buildBtns {
+  position: absolute;
+  top: 50px;
+  left: 0;
+}
+div#buildBtns::before,
+div#craftBtns::before {
+  content: attr(data-legend);
+  position: relative;
+  top: -5px;
+}
+div#craftBtns {
+  position: absolute;
+  top: 50px;
+  left: 150px;
+}
+
+/* Outside panel */
+div#outsidePanel { display: none; }
+
+/* Workers section */
+div#workers {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  border: 1px solid #000;
+  padding: 5px 10px;
+  width: 200px;
+  display: none;
+}
+div#workers::before {
+  position: absolute;
+  background: #fff;
+  content: attr(data-legend);
+  left: 8px;
+  top: -13px;
+}
+.workerRow { padding: 2px 0; cursor: default; }
+.workerRow .row_key { float: left; }
+.workerRow .row_val { float: right; width: 20px; text-align: center; }
+.workerRow .upBtn, .workerRow .downBtn {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 0 4px;
+  user-select: none;
+  float: right;
+}
+.workerRow .upBtn:hover, .workerRow .downBtn:hover {
+  text-decoration: underline;
+}
+
+/* Income summary */
+div#income {
+  position: absolute;
+  top: 50px;
+  left: 300px;
+  display: none;
+}
+div#income::before {
+  content: attr(data-legend);
+  position: relative;
+  top: -5px;
+}
+.incomeRow { padding: 1px 0; font-size: 14px; }
+.incomeRow .row_key { float: left; }
+.incomeRow .row_val { float: right; width: 60px; text-align: right; }
+.positive { color: green; }
+.negative { color: red; }
+
+/* Menu bar */
+.menu {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  color: #666;
+  z-index: 10;
+}
+.menu span {
+  cursor: pointer;
+  float: right;
+  margin-left: 20px;
+}
+.menu span:hover { text-decoration: underline; }
+
+/* Dark mode */
+body.dark { background: #000; color: #aaa; }
+body.dark div#notifyGradient { background: linear-gradient(rgba(0,0,0,0) 0%, #000 100%); }
+body.dark div.button { border-color: #aaa; }
+body.dark div.button.disabled { border-color: #555; color: #555; }
+body.dark div.button div.cooldown { background-color: #333; }
+body.dark div.button div.tooltip { border-color: #aaa; background: #000; }
+body.dark div#stores { border-color: #aaa; }
+body.dark div#stores::before { background: #000; }
+body.dark div#workers { border-color: #aaa; }
+body.dark div#workers::before { background: #000; }
+body.dark .headerButton { border-left-color: #aaa; }
+
+/* Event overlay */
+#eventPanel {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  justify-content: center;
+  align-items: center;
+}
+#eventContent {
+  background: #fff;
+  border: 1px solid #000;
+  padding: 20px 30px;
+  max-width: 400px;
+  text-align: center;
+}
+body.dark #eventContent { background: #111; border-color: #aaa; }
+#eventContent p { margin: 10px 0; line-height: 1.5; }
+#eventContent .evtBtn {
+  display: inline-block;
+  border: 1px solid #000;
+  padding: 5px 15px;
+  margin: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+#eventContent .evtBtn:hover { text-decoration: underline; }
+#eventContent .evtBtn.disabled {
+  border-color: #b2b2b2; color: #b2b2b2;
+  cursor: default; text-decoration: none;
+}
+body.dark #eventContent .evtBtn { border-color: #aaa; }
+body.dark #eventContent .evtBtn.disabled { border-color: #555; color: #555; }
+
+@media (max-width: 960px) {
+  div#wrapper { width: auto; padding: 15px 15px 0 15px; }
+  div#notifications { position: relative; top: 0; left: 0; width: 100%; height: 100px; margin-bottom: 10px; }
+  div.location { width: 100%; }
+  div#storesContainer { position: relative; right: auto; margin-bottom: 15px; }
+  div#stores { width: auto; }
+  div#buildBtns, div#craftBtns { position: relative; top: 0; left: 0; display: inline-block !important; vertical-align: top; margin-right: 20px; }
+  div#workers { position: relative; top: 0; right: auto; margin-top: 15px; width: auto; }
+  div#income { position: relative; left: 0; top: 0; }
+  div#locationSliderContainer { width: auto; overflow: visible; }
+  div#locationSlider { position: relative; width: auto; }
+}
+</style>
+</head>
+<body>
+
+<div id="wrapper">
+  <div id="header">
+    <div class="headerButton selected" id="location_room"></div>
+    <div class="headerButton" id="location_outside"></div>
+  </div>
+
+  <div id="notifications">
+    <div id="notifyGradient"></div>
+  </div>
+
+  <div id="locationSliderContainer">
+    <div id="locationSlider">
+      <!-- Room Panel -->
+      <div class="location" id="roomPanel">
+        <div id="storesContainer">
+          <div id="stores" data-legend="">
+            <div id="resources"></div>
+          </div>
+        </div>
+        <div id="fireButton" class="button free" style="width:80px;">
+          <div class="cooldown"></div>
+        </div>
+        <div id="stokeButton" class="button" style="width:80px;display:none;">
+          <div class="cooldown"></div>
+          <div class="tooltip"><div class="row_key" id="stokeTooltipKey"></div><div class="row_val">1</div><div class="clear"></div></div>
+        </div>
+        <div id="buildBtns" data-legend="" style="display:none;"></div>
+        <div id="craftBtns" data-legend="" style="display:none;"></div>
+      </div>
+
+      <!-- Outside Panel -->
+      <div class="location" id="outsidePanel">
+        <div id="gatherButton" class="button free" style="width:80px;">
+          <div class="cooldown"></div>
+        </div>
+        <div id="checkTrapsButton" class="button free" style="width:80px;display:none;">
+          <div class="cooldown"></div>
+        </div>
+        <div id="workers" data-legend=""></div>
+        <div id="income" data-legend=""></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="eventPanel">
+  <div id="eventContent"></div>
+</div>
+
+<div class="menu">
+  <span id="menuLang">language.</span>
+  <span id="menuRestart"></span>
+  <span id="menuLights"></span>
+  <span id="menuSave"></span>
+</div>
+
+<script>
+'use strict';
+
+// ===== I18N =====
+const I18N = {
+  zh: {
+    // Titles
+    darkRoom: '黑暗的房间',
+    firelitRoom: '有火的房间',
+    silentForest: '寂静的森林',
+    // Fire states (prefix + state + suffix)
+    firePrefix: '火', fireSuffix: '。',
+    fire: ['熄灭了','冒着烟','忽明忽暗','正在燃烧','熊熊燃烧'],
+    // Temp states
+    tempPrefix: '房间', tempSuffix: '。',
+    temp: ['冰冷刺骨','很冷','不冷不热','温暖如春','热气腾腾'],
+    // Resources
+    res: {
+      wood:'木头', fur:'毛皮', meat:'肉', scales:'鳞片', teeth:'牙齿',
+      cloth:'布匹', leather:'皮革', iron:'铁', coal:'煤', steel:'钢',
+      sulphur:'硫磺', bait:'诱饵', torch:'火把', curedMeat:'腌肉',
+      sword:'铁剑', rifle:'步枪', bullets:'子弹',
+    },
+    // Buildings
+    bld: {
+      trap:'陷阱', cart:'板车', hut:'小屋', lodge:'旅馆',
+      tradingPost:'交易站', tannery:'制革坊', smokehouse:'熏肉坊',
+      workshop:'工坊', steelworks:'炼钢坊', armoury:'军械库',
+    },
+    // Crafts
+    craft: {
+      torch:'火把', curedMeat:'腌肉', leather:'皮革',
+      sword:'铁剑', rifle:'步枪', bullets:'子弹 x5',
+    },
+    // Workers
+    worker: {
+      gatherer:'收集者', hunter:'猎人', trapper:'陷阱师', tanner:'制革师',
+      charcutier:'腌肉师', ironMiner:'铁矿工', coalMiner:'煤矿工',
+      sulphurMiner:'硫矿工', steelworker:'炼钢工', armourer:'军械师',
+    },
+    idle: '闲置',
+    // Buttons
+    lightFire: '生火',
+    stokeFire: '添柴',
+    gatherWood: '收集木头',
+    checkTraps: '检查陷阱',
+    // Section labels
+    stores: '仓库',
+    build: '建造',
+    craft: '制造',
+    workers: '工人',
+    income: '收入',
+    // Menu
+    save: '保存.',
+    lightsOff: '关灯.',
+    lightsOn: '开灯.',
+    restart: '重来.',
+    lang: 'english.',
+    // Messages
+    noWood: '木头不够了。',
+    gameSaved: '游戏已保存。',
+    confirmRestart: '确定要重新开始吗？所有进度将被清除。',
+    strangerArrives: '一个衣衫褴褛的陌生人跌跌撞撞地走进门来，倒在了角落里。',
+    strangerWakes: '陌生人醒了过来。',
+    strangerBuilder: '陌生人说她是个建筑师。',
+    builderForest: '建筑师说外面有棵树林可以收集木头。',
+    built: (name) => '建造了' + name + '。',
+    newPeople: '新的人出现在村口。',
+    crafted: (name) => '制造了' + name + '。',
+    gathered: (amt) => '收集了 ' + amt + ' 木头。',
+    noTraps: '没有陷阱。',
+    trapsEmpty: '陷阱是空的。',
+    trapsGot: (items) => '检查了陷阱，获得了 ' + items + '。',
+    trapJoin: '，',
+    // Events
+    events: [
+      { t:'一只野兽出现了', d:'一只饥饿的野兽在附近游荡。',
+        opts:[
+          {t:'用剑战斗', req:{sword:1}, rew:{fur:20,meat:20,teeth:5}, msg:'击败了野兽，获得了战利品。'},
+          {t:'躲起来', rew:{}, msg:'等到野兽离开了。', loss:{meat:10}},
+        ]},
+      { t:'一个商人到来', d:'一个风尘仆仆的商人出现在村口。',
+        opts:[
+          {t:'用毛皮换铁', req:{fur:50}, cost:{fur:50}, rew:{iron:30}, msg:'以毛皮换得了铁矿。'},
+          {t:'用毛皮换布', req:{fur:30}, cost:{fur:30}, rew:{cloth:20}, msg:'以毛皮换得了布匹。'},
+          {t:'不交易', rew:{}, msg:'商人叹了口气，离开了。'},
+        ]},
+      { t:'流浪者', d:'几个衣衫褴褛的流浪者请求收留。',
+        opts:[
+          {t:'收留他们', rew:{}, msg:'流浪者留下了。', pop:2},
+          {t:'拒绝', rew:{}, msg:'流浪者失望地离开了。'},
+        ]},
+      { t:'小偷', d:'有人半夜偷走了一些物资！',
+        opts:[
+          {t:'追出去', rew:{}, msg:'追回了一些东西。'},
+          {t:'算了', rew:{}, msg:'损失了一些物资。', loss:{wood:30,fur:10}},
+        ]},
+      { t:'旅行者', d:'一个旅行者路过，分享了一些物资。',
+        opts:[
+          {t:'感谢', rew:{wood:50,fur:20}, msg:'旅行者留下了物资，继续上路了。'},
+        ]},
+    ],
+    // Ambient
+    ambient: ['外面的风在呼啸。','远处传来嚎叫声。','木头噼啪作响。','风吹过窗缝，发出呜呜声。','雪花飘落在窗台上。','夜色深沉。','建筑师轻声哼着歌。','远处似乎有篝火的光。'],
+  },
+  en: {
+    darkRoom: 'A Dark Room',
+    firelitRoom: 'A Firelit Room',
+    silentForest: 'A Silent Forest',
+    firePrefix: 'the fire is ', fireSuffix: '.',
+    fire: ['dead','smouldering','flickering','burning','roaring'],
+    tempPrefix: 'the room is ', tempSuffix: '.',
+    temp: ['freezing','cold','mild','warm','hot'],
+    res: {
+      wood:'wood', fur:'fur', meat:'meat', scales:'scales', teeth:'teeth',
+      cloth:'cloth', leather:'leather', iron:'iron', coal:'coal', steel:'steel',
+      sulphur:'sulphur', bait:'bait', torch:'torch', curedMeat:'cured meat',
+      sword:'sword', rifle:'rifle', bullets:'bullets',
+    },
+    bld: {
+      trap:'trap', cart:'cart', hut:'hut', lodge:'lodge',
+      tradingPost:'trading post', tannery:'tannery', smokehouse:'smokehouse',
+      workshop:'workshop', steelworks:'steelworks', armoury:'armoury',
+    },
+    craft: {
+      torch:'torch', curedMeat:'cured meat', leather:'leather',
+      sword:'sword', rifle:'rifle', bullets:'bullets x5',
+    },
+    worker: {
+      gatherer:'gatherer', hunter:'hunter', trapper:'trapper', tanner:'tanner',
+      charcutier:'charcutier', ironMiner:'iron miner', coalMiner:'coal miner',
+      sulphurMiner:'sulphur miner', steelworker:'steelworker', armourer:'armourer',
+    },
+    idle: 'idle',
+    lightFire: 'light fire',
+    stokeFire: 'stoke fire',
+    gatherWood: 'gather wood',
+    checkTraps: 'check traps',
+    stores: 'stores',
+    build: 'build',
+    craft: 'craft',
+    workers: 'workers',
+    income: 'income',
+    save: 'save.',
+    lightsOff: 'lights off.',
+    lightsOn: 'lights on.',
+    restart: 'restart.',
+    lang: '中文.',
+    noWood: 'not enough wood.',
+    gameSaved: 'game saved.',
+    confirmRestart: 'restart the game? all progress will be lost.',
+    strangerArrives: 'a ragged stranger stumbles through the door and collapses in the corner.',
+    strangerWakes: 'the stranger is awake.',
+    strangerBuilder: 'the stranger says she can help. says she builds things.',
+    builderForest: 'the builder says there are some trees nearby, good for wood.',
+    built: (name) => 'built a ' + name + '.',
+    newPeople: 'new people arrive at the village.',
+    crafted: (name) => 'crafted ' + name + '.',
+    gathered: (amt) => 'gathered ' + amt + ' wood.',
+    noTraps: 'no traps.',
+    trapsEmpty: 'the traps are empty.',
+    trapsGot: (items) => 'checked the traps. got ' + items + '.',
+    trapJoin: ', ',
+    events: [
+      { t:'A Beast Attack', d:'a large beast is prowling the perimeter of the village.',
+        opts:[
+          {t:'fight with sword', req:{sword:1}, rew:{fur:20,meat:20,teeth:5}, msg:'defeated the beast. gained spoils.'},
+          {t:'hide', rew:{}, msg:'waited until the beast moved on.', loss:{meat:10}},
+        ]},
+      { t:'A Merchant Arrives', d:'a weathered merchant arrives at the village.',
+        opts:[
+          {t:'trade fur for iron', req:{fur:50}, cost:{fur:50}, rew:{iron:30}, msg:'traded fur for iron.'},
+          {t:'trade fur for cloth', req:{fur:30}, cost:{fur:30}, rew:{cloth:20}, msg:'traded fur for cloth.'},
+          {t:'decline', rew:{}, msg:'the merchant sighs and leaves.'},
+        ]},
+      { t:'Wanderers', d:'a few ragged wanderers ask for shelter.',
+        opts:[
+          {t:'take them in', rew:{}, msg:'the wanderers stay.', pop:2},
+          {t:'turn them away', rew:{}, msg:'the wanderers leave, disappointed.'},
+        ]},
+      { t:'A Thief', d:'someone stole some supplies in the night!',
+        opts:[
+          {t:'chase them', rew:{}, msg:'recovered some of the stolen goods.'},
+          {t:'let it go', rew:{}, msg:'lost some supplies.', loss:{wood:30,fur:10}},
+        ]},
+      { t:'A Traveller', d:'a traveller passes through, sharing supplies.',
+        opts:[
+          {t:'thank them', rew:{wood:50,fur:20}, msg:'the traveller leaves supplies and moves on.'},
+        ]},
+    ],
+    ambient: ['the wind howls outside.','a howl echoes in the distance.','the wood crackles in the fire.','the wind seeps through the cracks.','snowflakes settle on the windowsill.','the night is dark.','the builder hums softly.','a faint glow flickers in the distance.'],
+  },
+};
+
+let LANG = 'zh';
+function T(key) { return I18N[LANG][key]; }
+
+// ===== STATE =====
+const S = {
+  stores: {}, buildings: {}, workers: {},
+  fire: 0, temp: 0,
+  builder: -1, population: 0,
+  outside: false, dark: false, started: false,
+  builderTime: 0, cooldowns: {}, timers: {},
+};
+
+const BLDS_DEF = {
+  trap:       {c:{wood:10}, mx:10, p:()=>S.builder>=2},
+  cart:       {c:{wood:30}, mx:1,  p:()=>S.builder>=2},
+  hut:        {c:{wood:100},mx:20, p:()=>S.builder>=2},
+  lodge:      {c:{wood:200,fur:10}, mx:1, p:()=>(S.buildings.hut||0)>=1},
+  tradingPost:{c:{wood:400,fur:100},mx:1, p:()=>(S.buildings.lodge||0)>=1},
+  tannery:    {c:{wood:500,fur:50}, mx:1, p:()=>(S.buildings.tradingPost||0)>=1},
+  smokehouse: {c:{wood:600,meat:50},mx:1, p:()=>(S.buildings.tradingPost||0)>=1},
+  workshop:   {c:{wood:800,leather:100,scales:10},mx:1, p:()=>(S.buildings.tannery||0)>=1},
+  steelworks: {c:{wood:1500,iron:100,coal:100},  mx:1, p:()=>(S.buildings.workshop||0)>=1},
+  armoury:    {c:{wood:3000,steel:100,sulphur:50},mx:1, p:()=>(S.buildings.steelworks||0)>=1},
+};
+
+const CRAFTS_DEF = {
+  torch:    {c:{wood:1,cloth:1},          p:()=>(S.buildings.tradingPost||0)>=1},
+  curedMeat:{c:{meat:5,wood:5},            p:()=>(S.buildings.smokehouse||0)>=1},
+  leather:  {c:{fur:5},                    p:()=>(S.buildings.tannery||0)>=1},
+  sword:    {c:{wood:5,leather:5,iron:20}, p:()=>(S.buildings.workshop||0)>=1},
+  rifle:    {c:{wood:30,steel:20,sulphur:10},p:()=>(S.buildings.armoury||0)>=1},
+  bullets:  {c:{iron:5,sulphur:5},         p:()=>(S.buildings.armoury||0)>=1},
+};
+
+const WTYPES_DEF = [
+  {id:'gatherer', inc:{wood:1}},
+  {id:'hunter',   inc:{fur:0.5,meat:0.5}, p:()=>(S.buildings.hut||0)>=1},
+  {id:'trapper',  inc:{meat:-1,bait:1},   p:()=>(S.buildings.lodge||0)>=1},
+  {id:'tanner',   inc:{fur:-5,leather:1},  p:()=>(S.buildings.tannery||0)>=1},
+  {id:'charcutier',inc:{meat:-5,wood:-5,curedMeat:1},p:()=>(S.buildings.smokehouse||0)>=1},
+  {id:'ironMiner', inc:{curedMeat:-1,iron:1},       p:()=>(S.buildings.steelworks||0)>=1},
+  {id:'coalMiner', inc:{curedMeat:-1,coal:1},       p:()=>(S.buildings.steelworks||0)>=1},
+  {id:'sulphurMiner',inc:{curedMeat:-1,sulphur:1},  p:()=>(S.buildings.steelworks||0)>=1},
+  {id:'steelworker',inc:{iron:-1,coal:-1,steel:1},  p:()=>(S.buildings.steelworks||0)>=1},
+  {id:'armourer',  inc:{steel:-2,sulphur:-2,bullets:1},p:()=>(S.buildings.armoury||0)>=1},
+];
+
+// Helper: get localized resource name
+function rn(k) { return T('res')[k]||k; }
+// Helper: get localized building name
+function bn(k) { return T('bld')[k]||k; }
+// Helper: get localized craft name
+function cn(k) { return T('craft')[k]||k; }
+// Helper: get localized worker name
+function wn(k) { return T('worker')[k]||k; }
+
+// ===== RESOURCE HELPERS =====
+function res(k) { return S.stores[k]||0; }
+function setRes(k,v) { S.stores[k]=Math.max(0,Math.round(v*10)/10); updateStores(); }
+function addRes(k,a) { setRes(k, res(k)+a); }
+function hasCost(c) { for(const[k,v] of Object.entries(c)) if(res(k)<v)return false; return true; }
+function spend(c) { for(const[k,v] of Object.entries(c)) addRes(k,-v); }
+
+// ===== NOTIFICATIONS =====
+function notify(text) {
+  const box = document.getElementById('notifications');
+  const grad = document.getElementById('notifyGradient');
+  const d = document.createElement('div');
+  d.className = 'notification';
+  d.textContent = text;
+  box.insertBefore(d, box.firstChild);
+  requestAnimationFrame(() => requestAnimationFrame(() => d.style.opacity='1'));
+  const all = box.querySelectorAll('.notification');
+  if(all.length > 30) for(let i=30;i<all.length;i++) all[i].remove();
+}
+
+function fireMsg(idx) { return T('firePrefix') + T('fire')[idx] + T('fireSuffix'); }
+function tempMsg(idx) { return T('tempPrefix') + T('temp')[idx] + T('tempSuffix'); }
+
+// ===== COOLDOWN =====
+function cool(id, ms) {
+  const btn = document.getElementById(id);
+  if(!btn) return;
+  S.cooldowns[id] = true;
+  btn.classList.add('disabled');
+  const bar = btn.querySelector('.cooldown');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  requestAnimationFrame(() => {
+    bar.style.transition = `width ${ms}ms linear`;
+    bar.style.width = '0%';
+  });
+  setTimeout(() => { S.cooldowns[id]=false; btn.classList.remove('disabled'); }, ms);
+}
+function isCool(id) { return S.cooldowns[id]; }
+
+// ===== STORES UI =====
+function updateStores() {
+  const el = document.getElementById('resources');
+  const panel = document.getElementById('stores');
+  const order = ['wood','fur','meat','scales','teeth','cloth','bait','leather','iron','coal','steel','sulphur','curedMeat','torch','sword','rifle','bullets'];
+  const keys = Object.keys(S.stores).filter(k => S.stores[k]>0).sort((a,b) => {
+    const ia=order.indexOf(a), ib=order.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib);
+  });
+  if(!keys.length) { panel.style.display='none'; return; }
+  panel.style.display='block';
+  el.innerHTML = keys.map(k => {
+    const v = Math.floor(S.stores[k]);
+    return v>0 ? `<div class="storeRow"><div class="row_key">${rn(k)}</div><div class="row_val">${v}</div><div class="clear"></div></div>` : '';
+  }).join('');
+}
+
+// ===== FIRE =====
+function updateTitle() {
+  const t = S.fire<=0 ? T('darkRoom') : T('firelitRoom');
+  document.getElementById('location_room').textContent = t;
+  document.title = t;
+}
+
+function lightFire() {
+  if(isCool('fireButton')) return;
+  if(!S.started) {
+    S.started = true;
+    S.fire = 2;
+    notify(fireMsg(S.fire));
+    updateTitle();
+    document.getElementById('fireButton').style.display='none';
+    document.getElementById('stokeButton').style.display='block';
+    cool('stokeButton', 10000);
+    startTimers();
+    S.builderTime = Date.now() + 15000;
+    return;
+  }
+  if(res('wood')<5) { notify(T('noWood')); return; }
+  spend({wood:5});
+  S.fire = Math.min(4, S.fire+2);
+  notify(fireMsg(S.fire));
+  updateTitle();
+  document.getElementById('fireButton').style.display='none';
+  document.getElementById('stokeButton').style.display='block';
+  cool('stokeButton', 10000);
+}
+
+function stokeFire() {
+  if(isCool('stokeButton')) return;
+  if(res('wood')<1 && S.started) { notify(T('noWood')); return; }
+  if(S.started) addRes('wood', -1);
+  S.fire = Math.min(4, S.fire+1);
+  notify(fireMsg(S.fire));
+  updateTitle();
+  cool('stokeButton', 10000);
+}
+
+function fireDecay() {
+  if(S.fire > 0) {
+    S.fire--;
+    notify(fireMsg(S.fire));
+    updateTitle();
+    if(S.fire <= 0) {
+      document.getElementById('stokeButton').style.display='none';
+      document.getElementById('fireButton').style.display='block';
+      document.getElementById('fireButton').classList.remove('free');
+    }
+  }
+  const old = S.temp;
+  if(S.fire > S.temp) S.temp = Math.min(4, S.temp+1);
+  else if(S.fire < S.temp) S.temp = Math.max(0, S.temp-1);
+  if(old !== S.temp) notify(tempMsg(S.temp));
+}
+
+// ===== BUILDER PROGRESSION =====
+function checkBuilder() {
+  if(S.builder===-1 && S.builderTime>0 && Date.now()>=S.builderTime) {
+    S.builder = 0;
+    notify(T('strangerArrives'));
+    setTimeout(() => {
+      if(S.builder===0) {
+        S.builder = 1;
+        notify(T('strangerWakes'));
+        setTimeout(() => {
+          if(S.builder>=1) {
+            S.builder = 2;
+            notify(T('strangerBuilder'));
+            showBuild();
+            setTimeout(() => {
+              if(!S.outside) {
+                S.outside = true;
+                document.getElementById('location_outside').style.display='block';
+                notify(T('builderForest'));
+              }
+            }, 5000);
+          }
+        }, 12000);
+      }
+    }, 15000);
+  }
+}
+
+// ===== BUILD =====
+function showBuild() {
+  const c = document.getElementById('buildBtns');
+  c.style.display = 'block';
+  c.setAttribute('data-legend', T('build'));
+  refreshBuild();
+}
+
+function makeCostHTML(cost) {
+  return Object.entries(cost).map(([k,v]) =>
+    `<div class="row_key">${rn(k)}</div><div class="row_val">${v}</div><div class="clear"></div>`
+  ).join('');
+}
+
+function refreshBuild() {
+  const bc = document.getElementById('buildBtns');
+  if(!bc || bc.style.display==='none') return;
+  for(const[id,b] of Object.entries(BLDS_DEF)) {
+    if(!b.p()) continue;
+    if((S.buildings[id]||0)>=b.mx) { const old=document.getElementById('b_'+id); if(old)old.style.display='none'; continue; }
+    let btn = document.getElementById('b_'+id);
+    if(!btn) {
+      btn = document.createElement('div');
+      btn.id = 'b_'+id;
+      btn.className = 'button';
+      btn.style.display = 'block';
+      btn.dataset.bldId = id;
+      btn.innerHTML = `<span class="btnLabel">${bn(id)}</span><div class="cooldown"></div><div class="tooltip">${makeCostHTML(b.c)}</div>`;
+      btn.addEventListener('click', () => doBuild(id));
+      bc.appendChild(btn);
+    } else {
+      btn.querySelector('.btnLabel').textContent = bn(id);
+      btn.querySelector('.tooltip').innerHTML = makeCostHTML(b.c);
+    }
+    if(!isCool(btn.id)) btn.classList.toggle('disabled', !hasCost(b.c));
+  }
+  refreshCraft();
+}
+
+function doBuild(id) {
+  const b = BLDS_DEF[id], bid='b_'+id;
+  if(isCool(bid)||!hasCost(b.c)||(S.buildings[id]||0)>=b.mx) return;
+  spend(b.c);
+  S.buildings[id] = (S.buildings[id]||0)+1;
+  notify(T('built')(bn(id)));
+  cool(bid, 3000);
+  if(id==='hut') {
+    S.population += 4;
+    notify(T('newPeople'));
+    refreshWorkers();
+  }
+  if(id==='trap') {
+    document.getElementById('checkTrapsButton').style.display='block';
+  }
+  if((S.buildings[id]||0)>=b.mx) {
+    const btn=document.getElementById(bid); if(btn)btn.style.display='none';
+  }
+  refreshBuild();
+}
+
+// ===== CRAFT =====
+function refreshCraft() {
+  const cc = document.getElementById('craftBtns');
+  if(!cc) return;
+  let any = false;
+  for(const[id,cr] of Object.entries(CRAFTS_DEF)) {
+    if(!cr.p()) continue;
+    any = true;
+    let btn = document.getElementById('c_'+id);
+    if(!btn) {
+      btn = document.createElement('div');
+      btn.id = 'c_'+id;
+      btn.className = 'button';
+      btn.style.display = 'block';
+      btn.dataset.craftId = id;
+      btn.innerHTML = `<span class="btnLabel">${cn(id)}</span><div class="cooldown"></div><div class="tooltip">${makeCostHTML(cr.c)}</div>`;
+      btn.addEventListener('click', () => doCraft(id));
+      cc.appendChild(btn);
+    } else {
+      btn.querySelector('.btnLabel').textContent = cn(id);
+      btn.querySelector('.tooltip').innerHTML = makeCostHTML(cr.c);
+    }
+    if(!isCool(btn.id)) btn.classList.toggle('disabled', !hasCost(cr.c));
+  }
+  if(any) { cc.style.display='block'; cc.setAttribute('data-legend', T('craft')); }
+}
+
+function doCraft(id) {
+  const cr = CRAFTS_DEF[id], cid='c_'+id;
+  if(isCool(cid)||!hasCost(cr.c)) return;
+  spend(cr.c);
+  const amt = id==='bullets'?5 : 1;
+  addRes(id, amt);
+  notify(T('crafted')(cn(id)));
+  cool(cid, 3000);
+  refreshBuild();
+}
+
+// ===== OUTSIDE =====
+function gatherWood() {
+  if(isCool('gatherButton')) return;
+  const amt = (S.buildings.cart||0)>=1 ? 50 : 10;
+  addRes('wood', amt);
+  notify(T('gathered')(amt));
+  cool('gatherButton', 60000);
+}
+
+function checkTraps() {
+  if(isCool('checkTrapsButton')) return;
+  const n = S.buildings.trap||0;
+  if(!n) { notify(T('noTraps')); return; }
+  let fur=0, meat=0, scales=0, teeth=0, cloth=0;
+  for(let i=0;i<n;i++) {
+    const r=Math.random();
+    if(r<0.5) { fur+=Math.ceil(Math.random()*3); meat+=Math.ceil(Math.random()*3); }
+    else if(r<0.75) { scales+=Math.ceil(Math.random()*2); teeth+=Math.ceil(Math.random()*2); }
+    else if(r<0.85) { cloth+=Math.ceil(Math.random()*3); }
+  }
+  const ms=[];
+  if(fur) { addRes('fur',fur); ms.push(fur+' '+rn('fur')); }
+  if(meat) { addRes('meat',meat); ms.push(meat+' '+rn('meat')); }
+  if(scales) { addRes('scales',scales); ms.push(scales+' '+rn('scales')); }
+  if(teeth) { addRes('teeth',teeth); ms.push(teeth+' '+rn('teeth')); }
+  if(cloth) { addRes('cloth',cloth); ms.push(cloth+' '+rn('cloth')); }
+  notify(ms.length ? T('trapsGot')(ms.join(T('trapJoin'))) : T('trapsEmpty'));
+  cool('checkTrapsButton', 90000);
+  if(Math.random()<0.15) setTimeout(triggerEvent, 2000);
+}
+
+// ===== WORKERS =====
+function refreshWorkers() {
+  const wc = document.getElementById('workers');
+  if(S.population<=0) { wc.style.display='none'; return; }
+  wc.style.display='block';
+  let assigned=0;
+  for(const v of Object.values(S.workers)) assigned+=v;
+  const free = S.population - assigned;
+  let html = `<div class="workerRow"><div class="row_key">${T('idle')}</div><div class="row_val" style="width:auto;float:right">${free}</div><div class="clear"></div></div>`;
+  for(const w of WTYPES_DEF) {
+    if(w.p && !w.p()) continue;
+    const cnt = S.workers[w.id]||0;
+    html += `<div class="workerRow">
+      <div class="row_key">${wn(w.id)}</div>
+      <span class="upBtn" data-w="${w.id}">+</span>
+      <div class="row_val">${cnt}</div>
+      <span class="downBtn" data-w="${w.id}">-</span>
+      <div class="clear"></div>
+    </div>`;
+  }
+  wc.innerHTML = html;
+  wc.querySelectorAll('.upBtn').forEach(b => {
+    b.onclick = () => {
+      let a2=0; for(const v of Object.values(S.workers))a2+=v;
+      if(a2<S.population) { S.workers[b.dataset.w]=(S.workers[b.dataset.w]||0)+1; refreshWorkers(); refreshIncome(); }
+    };
+  });
+  wc.querySelectorAll('.downBtn').forEach(b => {
+    b.onclick = () => {
+      if((S.workers[b.dataset.w]||0)>0) { S.workers[b.dataset.w]--; refreshWorkers(); refreshIncome(); }
+    };
+  });
+  refreshIncome();
+}
+
+function refreshIncome() {
+  const ic = document.getElementById('income');
+  const totals = {};
+  for(const w of WTYPES_DEF) {
+    const cnt = S.workers[w.id]||0;
+    if(!cnt) continue;
+    for(const[r,rate] of Object.entries(w.inc)) totals[r]=(totals[r]||0)+rate*cnt;
+  }
+  const keys = Object.keys(totals).filter(k=>totals[k]!==0);
+  if(!keys.length) { ic.style.display='none'; return; }
+  ic.style.display='block';
+  ic.innerHTML = '';
+  for(const k of keys) {
+    const v=totals[k], sign=v>0?'+':'', cls=v>0?'positive':'negative';
+    const row = document.createElement('div');
+    row.className='incomeRow';
+    row.innerHTML=`<div class="row_key">${rn(k)}</div><div class="row_val ${cls}">${sign}${v.toFixed(1)}/s</div><div class="clear"></div>`;
+    ic.appendChild(row);
+  }
+}
+
+function workerProduce() {
+  for(const w of WTYPES_DEF) {
+    const cnt=S.workers[w.id]||0;
+    if(!cnt) continue;
+    for(const[r,rate] of Object.entries(w.inc)) {
+      const amt = rate*cnt*0.1;
+      if(rate<0 && res(r)<Math.abs(amt)) continue;
+      addRes(r, amt);
+    }
+  }
+}
+
+// ===== EVENTS =====
+function triggerEvent() {
+  const events = T('events');
+  const evt = events[Math.floor(Math.random()*events.length)];
+  const panel = document.getElementById('eventPanel');
+  const content = document.getElementById('eventContent');
+  let html = `<p style="font-size:18px;font-weight:bold;margin-bottom:15px">${evt.t}</p><p>${evt.d}</p><div style="margin-top:15px">`;
+  for(const o of evt.opts) {
+    const dis = o.req && !hasCost(o.req);
+    html += `<div class="evtBtn${dis?' disabled':''}" data-opt='${JSON.stringify(o)}'>${o.t}</div>`;
+  }
+  html += '</div>';
+  content.innerHTML = html;
+  panel.style.display = 'flex';
+  content.querySelectorAll('.evtBtn:not(.disabled)').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const o = JSON.parse(btn.dataset.opt);
+      if(o.cost) spend(o.cost);
+      if(o.rew) for(const[k,v] of Object.entries(o.rew)) addRes(k,v);
+      if(o.loss) for(const[k,v] of Object.entries(o.loss)) addRes(k,-v);
+      if(o.pop) { S.population+=o.pop; refreshWorkers(); }
+      notify(o.msg);
+      panel.style.display='none';
+    });
+  });
+}
+
+// ===== LOCATION SWITCH =====
+function switchLoc(loc) {
+  document.querySelectorAll('.headerButton').forEach(b=>b.classList.remove('selected'));
+  if(loc==='room') {
+    document.getElementById('location_room').classList.add('selected');
+    document.getElementById('locationSlider').style.left='0px';
+  } else {
+    document.getElementById('location_outside').classList.add('selected');
+    document.getElementById('locationSlider').style.left='-700px';
+    document.getElementById('outsidePanel').style.display='block';
+    document.getElementById('gatherButton').style.display='block';
+  }
+}
+
+// ===== LANGUAGE =====
+function setLang(lang) {
+  LANG = lang;
+  localStorage.setItem('adr_lang', lang);
+  document.documentElement.lang = lang==='zh'?'zh-CN':'en';
+  refreshAllText();
+}
+
+function refreshAllText() {
+  // Title & header
+  updateTitle();
+  document.getElementById('location_outside').textContent = T('silentForest');
+  // Buttons
+  document.getElementById('fireButton').firstChild.textContent = T('lightFire');
+  document.getElementById('stokeButton').firstChild.textContent = T('stokeFire');
+  document.getElementById('stokeTooltipKey').textContent = rn('wood');
+  document.getElementById('gatherButton').firstChild.textContent = T('gatherWood');
+  document.getElementById('checkTrapsButton').firstChild.textContent = T('checkTraps');
+  // Section labels
+  document.getElementById('stores').setAttribute('data-legend', T('stores'));
+  document.getElementById('workers').setAttribute('data-legend', T('workers'));
+  document.getElementById('income').setAttribute('data-legend', T('income'));
+  const bc = document.getElementById('buildBtns');
+  if(bc.style.display!=='none') bc.setAttribute('data-legend', T('build'));
+  const cc = document.getElementById('craftBtns');
+  if(cc.style.display!=='none') cc.setAttribute('data-legend', T('craft'));
+  // Menu
+  document.getElementById('menuSave').textContent = T('save');
+  document.getElementById('menuLights').textContent = S.dark ? T('lightsOn') : T('lightsOff');
+  document.getElementById('menuRestart').textContent = T('restart');
+  document.getElementById('menuLang').textContent = T('lang');
+  // Refresh dynamic sections
+  updateStores();
+  refreshBuild();
+  if(S.population>0) refreshWorkers();
+}
+
+// ===== SAVE / LOAD =====
+function saveGame() {
+  const d = {stores:S.stores, buildings:S.buildings, workers:S.workers,
+    fire:S.fire, temp:S.temp, builder:S.builder, population:S.population,
+    outside:S.outside, dark:S.dark, started:S.started};
+  localStorage.setItem('adr_save', JSON.stringify(d));
+  notify(T('gameSaved'));
+}
+
+function loadGame() {
+  const raw = localStorage.getItem('adr_save');
+  if(!raw) return false;
+  try {
+    const d = JSON.parse(raw);
+    Object.assign(S, d);
+    updateStores();
+    notify(fireMsg(S.fire));
+    notify(tempMsg(S.temp));
+    updateTitle();
+    if(S.started) {
+      document.getElementById('fireButton').style.display = S.fire<=0?'block':'none';
+      document.getElementById('stokeButton').style.display = S.fire>0?'block':'none';
+      if(S.fire<=0) document.getElementById('fireButton').classList.remove('free');
+      startTimers();
+    }
+    if(S.builder>=2) showBuild();
+    if(S.outside) {
+      document.getElementById('location_outside').style.display='block';
+      document.getElementById('outsidePanel').style.display='block';
+      document.getElementById('gatherButton').style.display='block';
+    }
+    if((S.buildings.trap||0)>0) document.getElementById('checkTrapsButton').style.display='block';
+    if(S.population>0) refreshWorkers();
+    if(S.dark) { document.body.classList.add('dark'); document.getElementById('menuLights').textContent=T('lightsOn'); }
+    return true;
+  } catch(e) { return false; }
+}
+
+// ===== TIMERS =====
+function startTimers() {
+  if(S.timers.fd) clearInterval(S.timers.fd);
+  S.timers.fd = setInterval(fireDecay, 30000);
+
+  if(S.timers.bld) clearInterval(S.timers.bld);
+  S.timers.bld = setInterval(checkBuilder, 2000);
+
+  if(S.timers.wrk) clearInterval(S.timers.wrk);
+  S.timers.wrk = setInterval(workerProduce, 100);
+
+  if(S.timers.ui) clearInterval(S.timers.ui);
+  S.timers.ui = setInterval(refreshBuild, 1000);
+
+  if(S.timers.sv) clearInterval(S.timers.sv);
+  S.timers.sv = setInterval(() => {
+    localStorage.setItem('adr_save', JSON.stringify({
+      stores:S.stores, buildings:S.buildings, workers:S.workers,
+      fire:S.fire, temp:S.temp, builder:S.builder, population:S.population,
+      outside:S.outside, dark:S.dark, started:S.started
+    }));
+  }, 60000);
+
+  if(S.timers.amb) clearInterval(S.timers.amb);
+  S.timers.amb = setInterval(() => {
+    if(Math.random()<0.3 && S.started) {
+      const msgs = T('ambient');
+      notify(msgs[Math.floor(Math.random()*msgs.length)]);
+    }
+  }, 45000);
+}
+
+// ===== INIT =====
+function init() {
+  // Detect language from URL param or localStorage
+  const params = new URLSearchParams(window.location.search);
+  const urlLang = params.get('lang');
+  const savedLang = localStorage.getItem('adr_lang');
+  if(urlLang==='en'||urlLang==='zh') LANG = urlLang;
+  else if(savedLang==='en'||savedLang==='zh') LANG = savedLang;
+  else LANG = 'zh';
+  localStorage.setItem('adr_lang', LANG);
+  document.documentElement.lang = LANG==='zh'?'zh-CN':'en';
+
+  // Set initial text
+  refreshAllText();
+
+  document.getElementById('location_room').style.display='block';
+  document.getElementById('fireButton').style.display='block';
+
+  if(!loadGame()) {
+    notify(tempMsg(0));
+    notify(fireMsg(0));
+  }
+
+  document.getElementById('fireButton').addEventListener('click', lightFire);
+  document.getElementById('stokeButton').addEventListener('click', stokeFire);
+  document.getElementById('gatherButton').addEventListener('click', gatherWood);
+  document.getElementById('checkTrapsButton').addEventListener('click', checkTraps);
+  document.getElementById('location_room').addEventListener('click', ()=>switchLoc('room'));
+  document.getElementById('location_outside').addEventListener('click', ()=>switchLoc('outside'));
+  document.getElementById('menuSave').addEventListener('click', saveGame);
+  document.getElementById('menuLights').addEventListener('click', () => {
+    S.dark=!S.dark;
+    document.body.classList.toggle('dark');
+    document.getElementById('menuLights').textContent=S.dark?T('lightsOn'):T('lightsOff');
+  });
+  document.getElementById('menuRestart').addEventListener('click', () => {
+    if(confirm(T('confirmRestart'))) {
+      localStorage.removeItem('adr_save');
+      location.reload();
+    }
+  });
+  document.getElementById('menuLang').addEventListener('click', () => {
+    setLang(LANG==='zh'?'en':'zh');
+  });
+}
+
+init();
+</script>
+</body>
+</html>

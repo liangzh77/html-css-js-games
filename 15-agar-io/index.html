@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大球吃小球 - Agar.io Clone</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    background: #111;
+    font-family: 'Microsoft YaHei', 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+canvas {
+    display: block;
+    cursor: none;
+}
+
+/* Start Screen */
+#startScreen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0f0f1a 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 0.5s;
+}
+
+#startScreen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.title {
+    font-size: 72px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+    text-shadow: none;
+    letter-spacing: 4px;
+}
+
+.subtitle {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 40px;
+    letter-spacing: 2px;
+}
+
+#nameInput {
+    width: 320px;
+    padding: 16px 24px;
+    font-size: 20px;
+    border: 2px solid #333;
+    border-radius: 50px;
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.3s;
+    font-family: inherit;
+}
+
+#nameInput:focus {
+    border-color: #48dbfb;
+}
+
+#nameInput::placeholder {
+    color: #555;
+}
+
+#startBtn {
+    margin-top: 20px;
+    width: 320px;
+    padding: 16px 24px;
+    font-size: 22px;
+    font-weight: 700;
+    border: none;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #48dbfb, #0abde3);
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    letter-spacing: 2px;
+}
+
+#startBtn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 30px rgba(72, 219, 251, 0.4);
+}
+
+.controls-info {
+    margin-top: 40px;
+    color: #555;
+    font-size: 14px;
+    text-align: center;
+    line-height: 2;
+}
+
+.controls-info span {
+    color: #48dbfb;
+    font-weight: 700;
+}
+
+/* HUD */
+#hud {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#hud.active {
+    display: block;
+}
+
+/* Leaderboard */
+#leaderboard {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 220px;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 16px;
+    color: #fff;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+#leaderboard h3 {
+    font-size: 16px;
+    text-align: center;
+    margin-bottom: 10px;
+    color: #feca57;
+    letter-spacing: 2px;
+}
+
+#leaderboard ol {
+    list-style: none;
+    padding: 0;
+    font-size: 13px;
+}
+
+#leaderboard li {
+    padding: 4px 8px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+    display: flex;
+    justify-content: space-between;
+    transition: background 0.3s;
+}
+
+#leaderboard li.me {
+    background: rgba(72, 219, 251, 0.25);
+    font-weight: 700;
+}
+
+#leaderboard li .rank {
+    color: #888;
+    width: 24px;
+}
+
+#leaderboard li .name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#leaderboard li .score {
+    color: #aaa;
+    margin-left: 8px;
+}
+
+/* Score display */
+#scoreDisplay {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+    pointer-events: none;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    letter-spacing: 1px;
+}
+
+/* Minimap */
+#minimapCanvas {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 180px;
+    height: 180px;
+    background: rgba(0,0,0,0.55);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    pointer-events: none;
+}
+
+/* Game Over Screen */
+#gameOverScreen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    backdrop-filter: blur(5px);
+}
+
+#gameOverScreen.active {
+    display: flex;
+}
+
+#gameOverScreen .go-title {
+    font-size: 56px;
+    font-weight: 900;
+    color: #ff6b6b;
+    margin-bottom: 10px;
+    letter-spacing: 4px;
+}
+
+#gameOverScreen .go-score {
+    font-size: 24px;
+    color: #ccc;
+    margin-bottom: 30px;
+}
+
+#gameOverScreen .go-score span {
+    color: #feca57;
+    font-weight: 700;
+}
+
+#restartBtn {
+    padding: 16px 60px;
+    font-size: 22px;
+    font-weight: 700;
+    border: none;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: #fff;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+    letter-spacing: 2px;
+}
+
+#restartBtn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 30px rgba(255, 107, 107, 0.4);
+}
+
+/* FPS counter */
+#fps {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    color: #555;
+    font-size: 12px;
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- Start Screen -->
+<div id="startScreen">
+    <div class="title">大球吃小球</div>
+    <div class="subtitle">在这个弱肉强食的世界中生存下去</div>
+    <input type="text" id="nameInput" placeholder="请输入你的名字" maxlength="16" autofocus>
+    <button id="startBtn">开始游戏</button>
+    <div class="controls-info">
+        <span>鼠标</span> 控制移动方向<br>
+        <span>空格键</span> 分裂 &nbsp;&nbsp; <span>W键</span> 喷射质量
+    </div>
+</div>
+
+<!-- Game Canvas -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+    <div id="scoreDisplay">得分: 0</div>
+    <div id="leaderboard">
+        <h3>🏆 排行榜</h3>
+        <ol id="leaderList"></ol>
+    </div>
+    <canvas id="minimapCanvas" width="180" height="180"></canvas>
+    <div id="fps"></div>
+</div>
+
+<!-- Game Over Screen -->
+<div id="gameOverScreen">
+    <div class="go-title">游戏结束</div>
+    <div class="go-score">最终得分: <span id="finalScore">0</span></div>
+    <button id="restartBtn">再来一局</button>
+</div>
+
+<script>
+// ========== CONFIGURATION ==========
+const CONFIG = {
+    WORLD_SIZE: 6000,
+    FOOD_COUNT: 800,
+    FOOD_SIZE_MIN: 5,
+    FOOD_SIZE_MAX: 9,
+    AI_COUNT: 15,
+    PLAYER_START_RADIUS: 20,
+    BASE_SPEED: 4.5,
+    MIN_SPEED: 1.2,
+    EASING: 0.08,
+    EAT_RATIO: 0.85,       // must be this fraction of other's radius to be eaten
+    GROWTH_FACTOR: 0.8,    // how much mass is gained from eating
+    DECAY_RATE: 0.9998,    // slow mass decay for large cells
+    SPLIT_VELOCITY: 18,
+    SPLIT_MIN_RADIUS: 28,
+    EJECT_MASS_RADIUS: 8,
+    EJECT_VELOCITY: 25,
+    EJECT_MIN_RADIUS: 25,
+    MERGE_TIMER: 8000,     // ms before split cells can merge
+    GRID_SIZE: 50,
+    ZOOM_BASE: 1.0,
+    ZOOM_FACTOR: 0.0025,
+    ZOOM_MIN: 0.2,
+    ZOOM_EASING: 0.04,
+    AI_DIRECTION_CHANGE: 0.02,
+    AI_CHASE_RANGE: 500,
+    AI_FLEE_RANGE: 600,
+};
+
+// AI Names
+const AI_NAMES = [
+    '小明', '大壮', '小红', '阿飞', '小美',
+    '天才', '大鱼', '小龙', '花花', '阿宝',
+    '飞飞', '胖虎', '小樱', '大力', '星星',
+    '月月', '豆豆', '果果', '乐乐', '糖糖'
+];
+
+// Vibrant colors
+const CELL_COLORS = [
+    '#ff6b6b', '#ee5a24', '#feca57', '#48dbfb', '#0abde3',
+    '#ff9ff3', '#f368e0', '#ff6348', '#7bed9f', '#2ed573',
+    '#1e90ff', '#5352ed', '#ffa502', '#ff4757', '#2bcbba',
+    '#a55eea', '#fd9644', '#fc5c65', '#45aaf2', '#26de81',
+    '#fed330', '#eb3b5a', '#20bf6b', '#4b7bec', '#8854d0'
+];
+
+// ========== UTILITY ==========
+function rand(min, max) { return Math.random() * (max - min) + min; }
+function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function randomColor() { return CELL_COLORS[randInt(0, CELL_COLORS.length - 1)]; }
+function massFromRadius(r) { return Math.PI * r * r; }
+function radiusFromMass(m) { return Math.sqrt(m / Math.PI); }
+
+// ========== GAME STATE ==========
+let canvas, ctx, minimapCanvas, minimapCtx;
+let gameRunning = false;
+let playerName = '玩家';
+let mouse = { x: 0, y: 0 };
+let camera = { x: 0, y: 0, zoom: 1, targetZoom: 1 };
+let player = null;       // array of player cells
+let aiPlayers = [];
+let foods = [];
+let ejectedMass = [];
+let frameCount = 0;
+let lastTime = 0;
+let fpsValue = 0;
+let fpsFrames = 0;
+let fpsTimer = 0;
+let maxScore = 0;
+
+// ========== CELL CLASS ==========
+class Cell {
+    constructor(x, y, radius, color, name, isPlayer = false) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.radius = radius;
+        this.color = color;
+        this.name = name;
+        this.isPlayer = isPlayer;
+        this.splitTime = 0;   // when this cell was split
+        this.mergeReady = true;
+
+        // AI state
+        this.aiAngle = Math.random() * Math.PI * 2;
+        this.aiTimer = 0;
+        this.aiTarget = null;
+        this.alive = true;
+    }
+
+    get mass() { return massFromRadius(this.radius); }
+    set mass(m) { this.radius = radiusFromMass(Math.max(m, massFromRadius(5))); }
+
+    get speed() {
+        const s = CONFIG.BASE_SPEED * (1 / (1 + (this.radius - CONFIG.PLAYER_START_RADIUS) * 0.012));
+        return Math.max(CONFIG.MIN_SPEED, s);
+    }
+
+    get score() { return Math.floor(this.mass / 10); }
+
+    draw(ctx) {
+        // Outer glow
+        const gradient = ctx.createRadialGradient(this.x, this.y, this.radius * 0.5, this.x, this.y, this.radius * 1.15);
+        gradient.addColorStop(0, this.color);
+        gradient.addColorStop(1, this.color + '00');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius * 1.15, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Main body
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Inner highlight
+        const hlGrad = ctx.createRadialGradient(
+            this.x - this.radius * 0.25, this.y - this.radius * 0.25, 0,
+            this.x, this.y, this.radius
+        );
+        hlGrad.addColorStop(0, 'rgba(255,255,255,0.25)');
+        hlGrad.addColorStop(0.5, 'rgba(255,255,255,0.05)');
+        hlGrad.addColorStop(1, 'rgba(0,0,0,0.1)');
+        ctx.fillStyle = hlGrad;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Border
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.lineWidth = Math.max(2, this.radius * 0.06);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Name
+        if (this.radius > 15) {
+            const fontSize = Math.max(10, Math.min(this.radius * 0.45, 32));
+            ctx.font = `bold ${fontSize}px "Microsoft YaHei", sans-serif`;
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+            ctx.strokeText(this.name, this.x, this.y);
+            ctx.fillText(this.name, this.x, this.y);
+        }
+    }
+
+    constrain() {
+        this.x = clamp(this.x, this.radius, CONFIG.WORLD_SIZE - this.radius);
+        this.y = clamp(this.y, this.radius, CONFIG.WORLD_SIZE - this.radius);
+    }
+}
+
+// ========== FOOD ==========
+class Food {
+    constructor() {
+        this.x = rand(10, CONFIG.WORLD_SIZE - 10);
+        this.y = rand(10, CONFIG.WORLD_SIZE - 10);
+        this.radius = rand(CONFIG.FOOD_SIZE_MIN, CONFIG.FOOD_SIZE_MAX);
+        this.color = randomColor();
+        this.angle = Math.random() * Math.PI * 2;
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Small highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc(this.x - this.radius * 0.2, this.y - this.radius * 0.2, this.radius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// ========== EJECTED MASS ==========
+class EjectedMass {
+    constructor(x, y, vx, vy, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.radius = CONFIG.EJECT_MASS_RADIUS;
+        this.color = color;
+        this.life = 1;
+    }
+
+    update() {
+        this.vx *= 0.92;
+        this.vy *= 0.92;
+        this.x += this.vx;
+        this.y += this.vy;
+        this.x = clamp(this.x, this.radius, CONFIG.WORLD_SIZE - this.radius);
+        this.y = clamp(this.y, this.radius, CONFIG.WORLD_SIZE - this.radius);
+    }
+
+    draw(ctx) {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// ========== INITIALIZATION ==========
+function init() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    minimapCanvas = document.getElementById('minimapCanvas');
+    minimapCtx = minimapCanvas.getContext('2d');
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    canvas.addEventListener('mousemove', onMouseMove);
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+    canvas.addEventListener('touchstart', onTouchMove, { passive: false });
+    window.addEventListener('keydown', onKeyDown);
+
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('restartBtn').addEventListener('click', restartGame);
+    document.getElementById('nameInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') startGame();
+    });
+
+    // Animate background on start screen
+    requestAnimationFrame(gameLoop);
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+function onMouseMove(e) {
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+}
+
+function onTouchMove(e) {
+    e.preventDefault();
+    if (e.touches.length > 0) {
+        mouse.x = e.touches[0].clientX;
+        mouse.y = e.touches[0].clientY;
+    }
+}
+
+function onKeyDown(e) {
+    if (!gameRunning) return;
+    if (e.code === 'Space') {
+        e.preventDefault();
+        splitPlayer();
+    }
+    if (e.code === 'KeyW') {
+        e.preventDefault();
+        ejectMass();
+    }
+}
+
+// ========== GAME START ==========
+function startGame() {
+    const input = document.getElementById('nameInput').value.trim();
+    playerName = input || '玩家';
+    document.getElementById('startScreen').classList.add('hidden');
+    document.getElementById('hud').classList.add('active');
+    document.getElementById('gameOverScreen').classList.remove('active');
+
+    initGameState();
+    gameRunning = true;
+}
+
+function restartGame() {
+    document.getElementById('gameOverScreen').classList.remove('active');
+    document.getElementById('hud').classList.add('active');
+    initGameState();
+    gameRunning = true;
+}
+
+function initGameState() {
+    // Create player
+    const startX = CONFIG.WORLD_SIZE / 2;
+    const startY = CONFIG.WORLD_SIZE / 2;
+    player = [new Cell(startX, startY, CONFIG.PLAYER_START_RADIUS, '#48dbfb', playerName, true)];
+
+    // Create food
+    foods = [];
+    for (let i = 0; i < CONFIG.FOOD_COUNT; i++) {
+        foods.push(new Food());
+    }
+
+    // Create AI
+    aiPlayers = [];
+    const shuffled = [...AI_NAMES].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < CONFIG.AI_COUNT; i++) {
+        spawnAI(shuffled[i % shuffled.length]);
+    }
+
+    ejectedMass = [];
+    maxScore = 0;
+    camera.zoom = CONFIG.ZOOM_BASE;
+    camera.targetZoom = CONFIG.ZOOM_BASE;
+}
+
+function spawnAI(name) {
+    const margin = 200;
+    const x = rand(margin, CONFIG.WORLD_SIZE - margin);
+    const y = rand(margin, CONFIG.WORLD_SIZE - margin);
+    const radius = rand(15, 60);
+    const color = randomColor();
+    const ai = new Cell(x, y, radius, color, name || AI_NAMES[randInt(0, AI_NAMES.length - 1)]);
+    ai.aiAngle = Math.random() * Math.PI * 2;
+    ai.alive = true;
+    aiPlayers.push(ai);
+    return ai;
+}
+
+// ========== PLAYER ACTIONS ==========
+function splitPlayer() {
+    const newCells = [];
+    const toSplit = [...player];
+    for (const cell of toSplit) {
+        if (cell.radius < CONFIG.SPLIT_MIN_RADIUS) continue;
+        if (player.length + newCells.length >= 16) break;
+
+        const angle = Math.atan2(
+            (mouse.y - canvas.height / 2) / camera.zoom,
+            (mouse.x - canvas.width / 2) / camera.zoom
+        );
+
+        const newMass = cell.mass / 2;
+        cell.mass = newMass;
+
+        const baby = new Cell(cell.x, cell.y, radiusFromMass(newMass), cell.color, cell.name, true);
+        baby.vx = Math.cos(angle) * CONFIG.SPLIT_VELOCITY;
+        baby.vy = Math.sin(angle) * CONFIG.SPLIT_VELOCITY;
+        baby.splitTime = Date.now();
+        baby.mergeReady = false;
+        cell.splitTime = Date.now();
+        cell.mergeReady = false;
+
+        newCells.push(baby);
+    }
+    player.push(...newCells);
+}
+
+function ejectMass() {
+    for (const cell of player) {
+        if (cell.radius < CONFIG.EJECT_MIN_RADIUS) continue;
+
+        const angle = Math.atan2(
+            (mouse.y - canvas.height / 2) / camera.zoom,
+            (mouse.x - canvas.width / 2) / camera.zoom
+        );
+
+        const massCost = massFromRadius(CONFIG.EJECT_MASS_RADIUS) * 1.5;
+        cell.mass = cell.mass - massCost;
+
+        const ex = cell.x + Math.cos(angle) * (cell.radius + CONFIG.EJECT_MASS_RADIUS + 5);
+        const ey = cell.y + Math.sin(angle) * (cell.radius + CONFIG.EJECT_MASS_RADIUS + 5);
+        const evx = Math.cos(angle) * CONFIG.EJECT_VELOCITY;
+        const evy = Math.sin(angle) * CONFIG.EJECT_VELOCITY;
+
+        ejectedMass.push(new EjectedMass(ex, ey, evx, evy, cell.color));
+    }
+}
+
+// ========== GAME OVER ==========
+function gameOver() {
+    gameRunning = false;
+    const totalScore = getTotalPlayerScore();
+    document.getElementById('finalScore').textContent = totalScore;
+    document.getElementById('hud').classList.remove('active');
+    document.getElementById('gameOverScreen').classList.add('active');
+}
+
+function getTotalPlayerMass() {
+    return player.reduce((s, c) => s + c.mass, 0);
+}
+
+function getTotalPlayerScore() {
+    return Math.floor(getTotalPlayerMass() / 10);
+}
+
+function getPlayerCenter() {
+    if (player.length === 0) return { x: CONFIG.WORLD_SIZE / 2, y: CONFIG.WORLD_SIZE / 2 };
+    let totalMass = 0, cx = 0, cy = 0;
+    for (const c of player) {
+        cx += c.x * c.mass;
+        cy += c.y * c.mass;
+        totalMass += c.mass;
+    }
+    return { x: cx / totalMass, y: cy / totalMass };
+}
+
+function getLargestPlayerRadius() {
+    if (player.length === 0) return CONFIG.PLAYER_START_RADIUS;
+    return Math.max(...player.map(c => c.radius));
+}
+
+// ========== UPDATE ==========
+function update(dt) {
+    if (!gameRunning) return;
+
+    frameCount++;
+    const now = Date.now();
+
+    // Update player cells
+    const center = getPlayerCenter();
+    for (const cell of player) {
+        // Mouse direction in world coordinates
+        const worldMouseX = center.x + (mouse.x - canvas.width / 2) / camera.zoom;
+        const worldMouseY = center.y + (mouse.y - canvas.height / 2) / camera.zoom;
+        const dx = worldMouseX - cell.x;
+        const dy = worldMouseY - cell.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > 2) {
+            const speed = cell.speed;
+            const factor = Math.min(distance, speed * 50) / distance;
+            const targetVX = dx * factor * CONFIG.EASING;
+            const targetVY = dy * factor * CONFIG.EASING;
+            cell.vx += (targetVX - cell.vx) * 0.15;
+            cell.vy += (targetVY - cell.vy) * 0.15;
+        } else {
+            cell.vx *= 0.9;
+            cell.vy *= 0.9;
+        }
+
+        // Apply split velocity with decay
+        cell.x += cell.vx;
+        cell.y += cell.vy;
+        cell.vx *= 0.97;
+        cell.vy *= 0.97;
+        cell.constrain();
+
+        // Check merge readiness
+        if (!cell.mergeReady && now - cell.splitTime > CONFIG.MERGE_TIMER) {
+            cell.mergeReady = true;
+        }
+
+        // Slow mass decay for large cells
+        if (cell.radius > 50) {
+            cell.mass = cell.mass * CONFIG.DECAY_RATE;
+        }
+    }
+
+    // Merge player cells
+    for (let i = 0; i < player.length; i++) {
+        for (let j = i + 1; j < player.length; j++) {
+            const a = player[i], b = player[j];
+            if (!a.mergeReady || !b.mergeReady) continue;
+            const d = dist(a, b);
+            if (d < Math.max(a.radius, b.radius) * 0.5) {
+                // Merge into larger
+                const big = a.radius >= b.radius ? a : b;
+                const small = a.radius < b.radius ? a : b;
+                big.mass = big.mass + small.mass;
+                player.splice(player.indexOf(small), 1);
+                j--;
+            }
+        }
+    }
+
+    // Push apart non-merge-ready player cells
+    for (let i = 0; i < player.length; i++) {
+        for (let j = i + 1; j < player.length; j++) {
+            const a = player[i], b = player[j];
+            const d = dist(a, b);
+            const minDist = a.radius + b.radius;
+            if (d < minDist && d > 0) {
+                const overlap = (minDist - d) / d * 0.5;
+                const ox = (a.x - b.x) * overlap;
+                const oy = (a.y - b.y) * overlap;
+                a.x += ox; a.y += oy;
+                b.x -= ox; b.y -= oy;
+            }
+        }
+    }
+
+    // Update AI
+    for (const ai of aiPlayers) {
+        if (!ai.alive) continue;
+        updateAI(ai, dt);
+        ai.constrain();
+
+        // AI mass decay
+        if (ai.radius > 50) {
+            ai.mass = ai.mass * CONFIG.DECAY_RATE;
+        }
+    }
+
+    // Update ejected mass
+    for (const e of ejectedMass) {
+        e.update();
+    }
+
+    // Player eats food
+    for (const cell of player) {
+        for (let i = foods.length - 1; i >= 0; i--) {
+            const f = foods[i];
+            if (dist(cell, f) < cell.radius - f.radius * 0.5) {
+                cell.mass = cell.mass + massFromRadius(f.radius) * CONFIG.GROWTH_FACTOR;
+                foods[i] = new Food(); // respawn
+            }
+        }
+    }
+
+    // Player eats ejected mass
+    for (const cell of player) {
+        for (let i = ejectedMass.length - 1; i >= 0; i--) {
+            const e = ejectedMass[i];
+            if (dist(cell, e) < cell.radius - e.radius * 0.4) {
+                cell.mass = cell.mass + massFromRadius(e.radius) * CONFIG.GROWTH_FACTOR;
+                ejectedMass.splice(i, 1);
+            }
+        }
+    }
+
+    // AI eats food
+    for (const ai of aiPlayers) {
+        if (!ai.alive) continue;
+        for (let i = foods.length - 1; i >= 0; i--) {
+            const f = foods[i];
+            if (dist(ai, f) < ai.radius - f.radius * 0.5) {
+                ai.mass = ai.mass + massFromRadius(f.radius) * CONFIG.GROWTH_FACTOR;
+                foods[i] = new Food();
+            }
+        }
+    }
+
+    // AI eats ejected mass
+    for (const ai of aiPlayers) {
+        if (!ai.alive) continue;
+        for (let i = ejectedMass.length - 1; i >= 0; i--) {
+            const e = ejectedMass[i];
+            if (dist(ai, e) < ai.radius - e.radius * 0.4) {
+                ai.mass = ai.mass + massFromRadius(e.radius) * CONFIG.GROWTH_FACTOR;
+                ejectedMass.splice(i, 1);
+            }
+        }
+    }
+
+    // Player vs AI collision
+    for (const cell of player) {
+        for (const ai of aiPlayers) {
+            if (!ai.alive) continue;
+            const d = dist(cell, ai);
+
+            // Player eats AI
+            if (cell.radius > ai.radius * (1 / CONFIG.EAT_RATIO) && d < cell.radius - ai.radius * 0.4) {
+                cell.mass = cell.mass + ai.mass * CONFIG.GROWTH_FACTOR;
+                ai.alive = false;
+                // Respawn AI after delay
+                setTimeout(() => respawnAI(ai), 3000);
+            }
+            // AI eats player cell
+            else if (ai.radius > cell.radius * (1 / CONFIG.EAT_RATIO) && d < ai.radius - cell.radius * 0.4) {
+                ai.mass = ai.mass + cell.mass * CONFIG.GROWTH_FACTOR;
+                const idx = player.indexOf(cell);
+                if (idx >= 0) player.splice(idx, 1);
+                if (player.length === 0) {
+                    gameOver();
+                    return;
+                }
+                break;
+            }
+        }
+    }
+
+    // AI vs AI collision
+    for (let i = 0; i < aiPlayers.length; i++) {
+        const a = aiPlayers[i];
+        if (!a.alive) continue;
+        for (let j = i + 1; j < aiPlayers.length; j++) {
+            const b = aiPlayers[j];
+            if (!b.alive) continue;
+            const d = dist(a, b);
+            if (a.radius > b.radius * (1 / CONFIG.EAT_RATIO) && d < a.radius - b.radius * 0.4) {
+                a.mass = a.mass + b.mass * CONFIG.GROWTH_FACTOR;
+                b.alive = false;
+                setTimeout(() => respawnAI(b), 3000);
+            } else if (b.radius > a.radius * (1 / CONFIG.EAT_RATIO) && d < b.radius - a.radius * 0.4) {
+                b.mass = b.mass + a.mass * CONFIG.GROWTH_FACTOR;
+                a.alive = false;
+                setTimeout(() => respawnAI(a), 3000);
+            }
+        }
+    }
+
+    // Ensure food count stays up
+    while (foods.length < CONFIG.FOOD_COUNT) {
+        foods.push(new Food());
+    }
+
+    // Camera
+    const pc = getPlayerCenter();
+    camera.x += (pc.x - camera.x) * 0.1;
+    camera.y += (pc.y - camera.y) * 0.1;
+
+    const largestR = getLargestPlayerRadius();
+    camera.targetZoom = CONFIG.ZOOM_BASE / (1 + (largestR - CONFIG.PLAYER_START_RADIUS) * CONFIG.ZOOM_FACTOR);
+    camera.targetZoom = Math.max(CONFIG.ZOOM_MIN, camera.targetZoom);
+    camera.zoom += (camera.targetZoom - camera.zoom) * CONFIG.ZOOM_EASING;
+
+    // Track max score
+    const currentScore = getTotalPlayerScore();
+    if (currentScore > maxScore) maxScore = currentScore;
+}
+
+function respawnAI(ai) {
+    const margin = 200;
+    ai.x = rand(margin, CONFIG.WORLD_SIZE - margin);
+    ai.y = rand(margin, CONFIG.WORLD_SIZE - margin);
+    ai.radius = rand(15, 45);
+    ai.color = randomColor();
+    ai.alive = true;
+    ai.aiAngle = Math.random() * Math.PI * 2;
+    ai.aiTarget = null;
+}
+
+// ========== AI BEHAVIOR ==========
+function updateAI(ai, dt) {
+    ai.aiTimer++;
+
+    // Find nearest threats and targets
+    let nearestThreat = null;
+    let nearestThreatDist = Infinity;
+    let nearestPrey = null;
+    let nearestPreyDist = Infinity;
+    let nearestFood = null;
+    let nearestFoodDist = Infinity;
+
+    // Check player cells as potential threats/prey
+    for (const pc of player) {
+        const d = dist(ai, pc);
+        if (pc.radius > ai.radius * (1 / CONFIG.EAT_RATIO) && d < CONFIG.AI_FLEE_RANGE) {
+            if (d < nearestThreatDist) {
+                nearestThreat = pc;
+                nearestThreatDist = d;
+            }
+        } else if (ai.radius > pc.radius * (1 / CONFIG.EAT_RATIO) && d < CONFIG.AI_CHASE_RANGE) {
+            if (d < nearestPreyDist) {
+                nearestPrey = pc;
+                nearestPreyDist = d;
+            }
+        }
+    }
+
+    // Check other AI as threats/prey
+    for (const other of aiPlayers) {
+        if (other === ai || !other.alive) continue;
+        const d = dist(ai, other);
+        if (other.radius > ai.radius * (1 / CONFIG.EAT_RATIO) && d < CONFIG.AI_FLEE_RANGE) {
+            if (d < nearestThreatDist) {
+                nearestThreat = other;
+                nearestThreatDist = d;
+            }
+        } else if (ai.radius > other.radius * (1 / CONFIG.EAT_RATIO) && d < CONFIG.AI_CHASE_RANGE) {
+            if (d < nearestPreyDist) {
+                nearestPrey = other;
+                nearestPreyDist = d;
+            }
+        }
+    }
+
+    // Find nearest food
+    for (const f of foods) {
+        const d = dist(ai, f);
+        if (d < nearestFoodDist) {
+            nearestFood = f;
+            nearestFoodDist = d;
+        }
+    }
+
+    let targetX, targetY;
+
+    if (nearestThreat && nearestThreatDist < CONFIG.AI_FLEE_RANGE) {
+        // FLEE from threat
+        const angle = Math.atan2(ai.y - nearestThreat.y, ai.x - nearestThreat.x);
+        targetX = ai.x + Math.cos(angle) * 300;
+        targetY = ai.y + Math.sin(angle) * 300;
+    } else if (nearestPrey && nearestPreyDist < CONFIG.AI_CHASE_RANGE) {
+        // CHASE prey
+        targetX = nearestPrey.x;
+        targetY = nearestPrey.y;
+    } else if (nearestFood && nearestFoodDist < 300) {
+        // Go to food
+        targetX = nearestFood.x;
+        targetY = nearestFood.y;
+    } else {
+        // Random wander
+        if (Math.random() < CONFIG.AI_DIRECTION_CHANGE) {
+            ai.aiAngle += rand(-0.8, 0.8);
+        }
+        // Steer away from edges
+        const edgeMargin = 300;
+        if (ai.x < edgeMargin) ai.aiAngle = rand(-0.5, 0.5);
+        if (ai.x > CONFIG.WORLD_SIZE - edgeMargin) ai.aiAngle = rand(Math.PI - 0.5, Math.PI + 0.5);
+        if (ai.y < edgeMargin) ai.aiAngle = rand(0.5, Math.PI - 0.5);
+        if (ai.y > CONFIG.WORLD_SIZE - edgeMargin) ai.aiAngle = rand(-Math.PI + 0.5, -0.5);
+
+        targetX = ai.x + Math.cos(ai.aiAngle) * 200;
+        targetY = ai.y + Math.sin(ai.aiAngle) * 200;
+    }
+
+    // Move toward target with easing
+    const dx = targetX - ai.x;
+    const dy = targetY - ai.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance > 1) {
+        const speed = ai.speed;
+        const moveX = (dx / distance) * speed;
+        const moveY = (dy / distance) * speed;
+        ai.vx += (moveX - ai.vx) * 0.08;
+        ai.vy += (moveY - ai.vy) * 0.08;
+    }
+
+    ai.x += ai.vx;
+    ai.y += ai.vy;
+}
+
+// ========== RENDER ==========
+function render() {
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Background
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.save();
+    // Apply camera transform
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(camera.zoom, camera.zoom);
+    ctx.translate(-camera.x, -camera.y);
+
+    // Visible bounds
+    const viewLeft = camera.x - (w / 2) / camera.zoom;
+    const viewRight = camera.x + (w / 2) / camera.zoom;
+    const viewTop = camera.y - (h / 2) / camera.zoom;
+    const viewBottom = camera.y + (h / 2) / camera.zoom;
+
+    // Grid
+    drawGrid(viewLeft, viewRight, viewTop, viewBottom);
+
+    // World border
+    ctx.strokeStyle = 'rgba(255, 100, 100, 0.4)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(0, 0, CONFIG.WORLD_SIZE, CONFIG.WORLD_SIZE);
+
+    // Outer darkness
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(-2000, -2000, CONFIG.WORLD_SIZE + 4000, 2000); // top
+    ctx.fillRect(-2000, CONFIG.WORLD_SIZE, CONFIG.WORLD_SIZE + 4000, 2000); // bottom
+    ctx.fillRect(-2000, 0, 2000, CONFIG.WORLD_SIZE); // left
+    ctx.fillRect(CONFIG.WORLD_SIZE, 0, 2000, CONFIG.WORLD_SIZE); // right
+
+    // Draw food (only visible ones)
+    for (const f of foods) {
+        if (f.x + f.radius > viewLeft && f.x - f.radius < viewRight &&
+            f.y + f.radius > viewTop && f.y - f.radius < viewBottom) {
+            f.draw(ctx);
+        }
+    }
+
+    // Draw ejected mass
+    for (const e of ejectedMass) {
+        if (e.x + e.radius > viewLeft && e.x - e.radius < viewRight &&
+            e.y + e.radius > viewTop && e.y - e.radius < viewBottom) {
+            e.draw(ctx);
+        }
+    }
+
+    // Collect all cells to sort by size (small drawn first)
+    const allCells = [];
+    for (const ai of aiPlayers) {
+        if (ai.alive) allCells.push(ai);
+    }
+    for (const pc of player) {
+        allCells.push(pc);
+    }
+    allCells.sort((a, b) => a.radius - b.radius);
+
+    for (const cell of allCells) {
+        if (cell.x + cell.radius > viewLeft - 50 && cell.x - cell.radius < viewRight + 50 &&
+            cell.y + cell.radius > viewTop - 50 && cell.y - cell.radius < viewBottom + 50) {
+            cell.draw(ctx);
+        }
+    }
+
+    ctx.restore();
+
+    // Cursor crosshair
+    if (gameRunning) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1.5;
+        const cx = mouse.x, cy = mouse.y;
+        ctx.beginPath();
+        ctx.moveTo(cx - 12, cy); ctx.lineTo(cx + 12, cy);
+        ctx.moveTo(cx, cy - 12); ctx.lineTo(cx, cy + 12);
+        ctx.stroke();
+    }
+}
+
+function drawGrid(viewLeft, viewRight, viewTop, viewBottom) {
+    const gs = CONFIG.GRID_SIZE;
+    const startX = Math.floor(viewLeft / gs) * gs;
+    const startY = Math.floor(viewTop / gs) * gs;
+    const endX = Math.ceil(viewRight / gs) * gs;
+    const endY = Math.ceil(viewBottom / gs) * gs;
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = startX; x <= endX; x += gs) {
+        if (x < 0 || x > CONFIG.WORLD_SIZE) continue;
+        ctx.moveTo(x, Math.max(0, startY));
+        ctx.lineTo(x, Math.min(CONFIG.WORLD_SIZE, endY));
+    }
+    for (let y = startY; y <= endY; y += gs) {
+        if (y < 0 || y > CONFIG.WORLD_SIZE) continue;
+        ctx.moveTo(Math.max(0, startX), y);
+        ctx.lineTo(Math.min(CONFIG.WORLD_SIZE, endX), y);
+    }
+    ctx.stroke();
+}
+
+// ========== MINIMAP ==========
+function drawMinimap() {
+    const mw = minimapCanvas.width;
+    const mh = minimapCanvas.height;
+    const scale = mw / CONFIG.WORLD_SIZE;
+
+    minimapCtx.clearRect(0, 0, mw, mh);
+
+    // Background
+    minimapCtx.fillStyle = 'rgba(15, 15, 26, 0.8)';
+    minimapCtx.fillRect(0, 0, mw, mh);
+
+    // Border
+    minimapCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+    minimapCtx.lineWidth = 1;
+    minimapCtx.strokeRect(0, 0, mw, mh);
+
+    // AI dots
+    for (const ai of aiPlayers) {
+        if (!ai.alive) continue;
+        const mr = Math.max(2, ai.radius * scale);
+        minimapCtx.fillStyle = ai.color + '99';
+        minimapCtx.beginPath();
+        minimapCtx.arc(ai.x * scale, ai.y * scale, mr, 0, Math.PI * 2);
+        minimapCtx.fill();
+    }
+
+    // Player dots
+    for (const pc of player) {
+        const mr = Math.max(3, pc.radius * scale);
+        minimapCtx.fillStyle = '#48dbfb';
+        minimapCtx.beginPath();
+        minimapCtx.arc(pc.x * scale, pc.y * scale, mr, 0, Math.PI * 2);
+        minimapCtx.fill();
+
+        // Glow
+        minimapCtx.fillStyle = 'rgba(72, 219, 251, 0.3)';
+        minimapCtx.beginPath();
+        minimapCtx.arc(pc.x * scale, pc.y * scale, mr + 3, 0, Math.PI * 2);
+        minimapCtx.fill();
+    }
+
+    // Viewport rectangle
+    const vw = canvas.width / camera.zoom * scale;
+    const vh = canvas.height / camera.zoom * scale;
+    const vx = (camera.x - canvas.width / 2 / camera.zoom) * scale;
+    const vy = (camera.y - canvas.height / 2 / camera.zoom) * scale;
+    minimapCtx.strokeStyle = 'rgba(255,255,255,0.35)';
+    minimapCtx.lineWidth = 1;
+    minimapCtx.strokeRect(vx, vy, vw, vh);
+}
+
+// ========== LEADERBOARD ==========
+function updateLeaderboard() {
+    const entries = [];
+
+    // Player
+    const pScore = getTotalPlayerScore();
+    entries.push({ name: playerName, score: pScore, isPlayer: true });
+
+    // AI
+    for (const ai of aiPlayers) {
+        if (!ai.alive) continue;
+        entries.push({ name: ai.name, score: ai.score, isPlayer: false });
+    }
+
+    entries.sort((a, b) => b.score - a.score);
+    const top10 = entries.slice(0, 10);
+
+    const list = document.getElementById('leaderList');
+    list.innerHTML = '';
+    for (let i = 0; i < top10.length; i++) {
+        const e = top10[i];
+        const li = document.createElement('li');
+        if (e.isPlayer) li.classList.add('me');
+        li.innerHTML = `<span class="rank">${i + 1}.</span><span class="name">${e.name}</span><span class="score">${e.score}</span>`;
+        list.appendChild(li);
+    }
+
+    document.getElementById('scoreDisplay').textContent = `得分: ${pScore}`;
+}
+
+// ========== GAME LOOP ==========
+function gameLoop(timestamp) {
+    const dt = Math.min((timestamp - lastTime) / 16.67, 3); // normalize to ~60fps, cap
+    lastTime = timestamp;
+
+    // FPS
+    fpsFrames++;
+    fpsTimer += timestamp - (lastTime - dt * 16.67);
+    if (fpsFrames >= 30) {
+        fpsValue = Math.round(1000 / ((timestamp - fpsTimer) / fpsFrames));
+        fpsTimer = timestamp;
+        fpsFrames = 0;
+    }
+
+    if (gameRunning) {
+        update(dt);
+        render();
+        drawMinimap();
+
+        if (frameCount % 15 === 0) {
+            updateLeaderboard();
+        }
+
+        document.getElementById('fps').textContent = `FPS: ${fpsValue}`;
+    } else {
+        // Draw background animation on start/end screens
+        renderIdleBackground();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+function renderIdleBackground() {
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#0f0f1a';
+    ctx.fillRect(0, 0, w, h);
+
+    // Floating circles
+    const time = Date.now() * 0.001;
+    for (let i = 0; i < 20; i++) {
+        const x = (Math.sin(time * 0.3 + i * 1.3) * 0.5 + 0.5) * w;
+        const y = (Math.cos(time * 0.2 + i * 0.9) * 0.5 + 0.5) * h;
+        const r = 20 + Math.sin(time + i) * 10;
+        const color = CELL_COLORS[i % CELL_COLORS.length];
+
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+}
+
+// ========== INIT ==========
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
