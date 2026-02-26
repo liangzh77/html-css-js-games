@@ -1136,9 +1136,7 @@ function renderBoard() {
     corner.className = 'tile-corner';
     el.appendChild(corner);
 
-    if (free) {
-      el.addEventListener('click', () => selectTile(tile.idx));
-    }
+    el.onclick = () => selectTile(tile.idx);
 
     container.appendChild(el);
   });
@@ -1160,13 +1158,7 @@ function updateTileStates() {
     el.classList.toggle('selected', selected);
     el.classList.toggle('hint', hinted);
 
-    if (free) {
-      el.style.cursor = 'pointer';
-      el.onclick = () => selectTile(idx);
-    } else {
-      el.style.cursor = 'default';
-      el.onclick = null;
-    }
+    el.style.cursor = free ? 'pointer' : 'default';
   });
 }
 
