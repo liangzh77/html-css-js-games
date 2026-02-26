@@ -193,6 +193,7 @@ select.btn {
   height: 58px;
   background: linear-gradient(180deg, #c8bc98 0%, #a89878 100%);
   border-radius: 0 3px 3px 0;
+  pointer-events: none;
 }
 
 .tile .tile-bottom {
@@ -203,6 +204,7 @@ select.btn {
   height: 4px;
   background: linear-gradient(90deg, #a89878 0%, #c8bc98 100%);
   border-radius: 0 0 3px 3px;
+  pointer-events: none;
 }
 
 .tile .tile-corner {
@@ -213,6 +215,7 @@ select.btn {
   height: 4px;
   background: #a89878;
   border-radius: 0 0 3px 0;
+  pointer-events: none;
 }
 
 /* Layer offset for stacking */
@@ -1099,7 +1102,7 @@ function renderBoard() {
     el.dataset.layer = tile.layer;
     el.style.left = x + 'px';
     el.style.top = y + 'px';
-    el.style.zIndex = tile.layer * 100 + tile.row * 2 + (tile.col > 0 ? 1 : 0);
+    el.style.zIndex = tile.layer * 1000 + tile.row * 50 + tile.col;
 
     // Tile face
     const face = document.createElement('div');
